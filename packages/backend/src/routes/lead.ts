@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { LeadResponse } from '@wg-chat/shared';
 import { isOriginAllowed, resolveTenantBySiteKey } from '../services/tenant.js';
 import { createLead, dispatchLeadNotifications } from '../services/lead.js';
+import { runForTenant } from '../db/client.js';
 
 const bodySchema = z
   .object({
@@ -42,13 +43,19 @@ export async function leadRoutes(app: FastifyInstance): Promise<void> {
       reply.code(403);
       return { error: 'origin_not_allowed', message: 'Diese Domain ist nicht freigegeben.' };
     }
+    if (!tenant.schemaName) {
+      reply.code(503);
+      return { error: 'not_provisioned', message: 'Tenant ist noch nicht eingerichtet.' };
+    }
 
-    const lead = await createLead(tenant, parsed.data);
-
-    // Benachrichtigungen nicht-blockierend – schnelle Antwort fürs Widget.
-    void dispatchLeadNotifications(tenant, lead, (m) =>
-      req.log.info({ tenant: tenant.siteKey }, `[lead] ${m}`),
-    ).catch((err) => req.log.error({ err }, 'lead dispatch failed'));
+    const lead = await runForTenant(tenant.schemaName, async () => {
+      const l = await createLead(tenant, parsed.data);
+      // Benachrichtigungen nicht-blockierend – schnelle Antwort fürs Widget.
+      void dispatchLeadNotifications(tenant, l, (m) =>
+        req.log.info({ tenant: tenant.siteKey }, `[lead] ${m}`),
+      ).catch((err) => req.log.error({ err }, 'lead dispatch failed'));
+      return l;
+    });
 
     const res: LeadResponse = { ok: true, leadId: lead.id };
     return res;

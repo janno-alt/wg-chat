@@ -4,6 +4,7 @@ import { resolveTenantBySiteKey } from '../services/tenant.js';
 import { addAgentMessage, getConversation, setHandedOff } from '../services/conversation.js';
 import { hub, type WsLike } from '../services/hub.js';
 import { getSessionUser } from './auth.js';
+import { runForTenant } from '../db/client.js';
 
 interface AgentQuery {
   siteKey?: string;
@@ -36,10 +37,11 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
     const tenant = await resolveTenantBySiteKey(siteKey);
-    if (!tenant) {
+    if (!tenant || !tenant.schemaName) {
       socket.close();
       return;
     }
+    const schema = tenant.schemaName;
     const s = socket as unknown as WsLike;
     hub.addAgent(tenant.id, s);
 
@@ -52,22 +54,24 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
       }
       const convId = msg.conversationId;
       if (!convId) return;
-      // Konversation muss zum Tenant gehören
-      const conv = await getConversation(tenant.id, convId);
-      if (!conv) return;
+      await runForTenant(schema, async () => {
+        // Konversation muss zum Tenant gehören
+        const conv = await getConversation(tenant.id, convId);
+        if (!conv) return;
 
-      if (msg.type === 'takeover' || msg.type === 'release') {
-        const active = msg.type === 'takeover';
-        await setHandedOff(tenant.id, convId, active);
-        hub.sendToVisitor(convId, { type: 'handoff', active });
-        hub.broadcastToAgents(tenant.id, { type: 'handoff', conversationId: convId, active });
-      } else if (msg.type === 'agent_message') {
-        const text = String(msg.text ?? '').slice(0, 4000).trim();
-        if (!text) return;
-        await addAgentMessage(convId, text);
-        hub.sendToVisitor(convId, { type: 'message', role: 'agent', text });
-        hub.broadcastToAgents(tenant.id, { type: 'agent_message', conversationId: convId, text });
-      }
+        if (msg.type === 'takeover' || msg.type === 'release') {
+          const active = msg.type === 'takeover';
+          await setHandedOff(tenant.id, convId, active);
+          hub.sendToVisitor(convId, { type: 'handoff', active });
+          hub.broadcastToAgents(tenant.id, { type: 'handoff', conversationId: convId, active });
+        } else if (msg.type === 'agent_message') {
+          const text = String(msg.text ?? '').slice(0, 4000).trim();
+          if (!text) return;
+          await addAgentMessage(convId, text);
+          hub.sendToVisitor(convId, { type: 'message', role: 'agent', text });
+          hub.broadcastToAgents(tenant.id, { type: 'agent_message', conversationId: convId, text });
+        }
+      });
     });
 
     socket.on('close', () => hub.removeAgent(tenant.id, s));
@@ -80,11 +84,11 @@ export async function wsRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
     const tenant = await resolveTenantBySiteKey(siteKey);
-    if (!tenant) {
+    if (!tenant || !tenant.schemaName) {
       socket.close();
       return;
     }
-    const conv = await getConversation(tenant.id, conversationId);
+    const conv = await runForTenant(tenant.schemaName, () => getConversation(tenant.id, conversationId));
     // Nur der Eigentümer der Session darf mithören
     if (!conv || conv.sessionId !== sessionId) {
       socket.close();

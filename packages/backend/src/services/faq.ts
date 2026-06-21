@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { db } from '../db/client.js';
+import { tdb } from '../db/client.js';
 import { kbDocuments } from '../db/schema.js';
 
 // kleine deutsche/englische Stopwort-Liste – Füllwörter sollen Matches nicht verfälschen
@@ -31,6 +31,7 @@ export interface FaqMatch {
  * vorkommen. Konservativ (min. 2 Treffer + Ratio), um Fehlauslösungen zu vermeiden.
  */
 export async function matchFaq(tenantId: string, message: string): Promise<FaqMatch | null> {
+  const db = tdb();
   const docs = await db
     .select()
     .from(kbDocuments)

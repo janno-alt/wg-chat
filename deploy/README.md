@@ -180,8 +180,18 @@ Mittwald = Hosting in Deutschland/EU; Chatverläufe + Embeddings in der EU-Postg
 Mistral als EU-Provider. AVV mit Mittwald und Mistral abschließen. Claude/Anthropic
 wird nur intern fürs MCP-Management genutzt (Phase 6), nie im Antwortpfad des Bots.
 
-## Pro-Kunde-Trennung (Erinnerung)
+## Pro-Kunde-Trennung (Schema pro Kunde, Phase 8b)
 
-Default ist Row-Level-Isolation über `tenant_id` + Origin-Whitelist je Tenant.
-Für besonders sensible Kunden kann ein eigener Stack mit eigener Postgres
-(eigenes Volume) gefahren werden – gleicher Code, vollständig isolierte Daten.
+Jeder Kunde bekommt ein **eigenes Postgres-Schema** `t_<id>` mit eigenen Tabellen
+(KB, Konversationen, Leads, Kosten, Wissenslücken). Ein Bot sieht technisch nur
+sein Schema – kein Zugriff auf fremde Kundendaten. Agentur-Config (tenants, users,
+Einstellungen, Outreach-Trigger) liegt in `public`.
+
+**Beim Anlegen** eines Kunden (Dashboard/MCP) wird das Schema automatisch erstellt.
+
+**Umstellung bestehender Installation:** Die Migration ergänzt `schema_name` und legt
+für vorhandene Kunden ein Schema an (Backfill). **Alt-Daten in `public` werden NICHT
+automatisch migriert** – Test-Tenants (z. B. `demo`) einfach neu seeden
+(`npm run seed`), echte Kunden ggf. neu anlegen. Reihenfolge nach 8b-Deploy:
+1. Image bauen → Backend „Image pullen" + „Recreate" (Migration läuft beim Start).
+2. `mw container exec <backend> -- npm run seed` (legt `demo` im eigenen Schema neu an).

@@ -1,6 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm';
 import type { ChatRequest, ChatResponse, QuickReply } from '@wg-chat/shared';
-import { db } from '../db/client.js';
+import { tdb } from '../db/client.js';
 import { knowledgeGaps } from '../db/schema.js';
 import { getProviderForTenant } from '../llm/index.js';
 import { resolveThresholds, type ResolvedTenant } from './tenant.js';
@@ -100,7 +100,7 @@ export async function runCascade(
 
     // ── Stufe 5: RAG-Generierung (nur bei mittlerer Konfidenz UND innerhalb Budget) ──
     if (top && top.similarity >= th.rag) {
-      const within = await canGenerate(t.id);
+      const within = await canGenerate(t.monthlyBudgetEur);
       if (!within) {
         log('budget exhausted → escalation statt RAG');
       } else {
@@ -163,6 +163,7 @@ export async function runCascade(
 
 /** Unbeantwortete Frage als Wissenslücke protokollieren (Häufigkeit hochzählen). */
 async function logKnowledgeGap(tenantId: string, question: string): Promise<void> {
+  const db = tdb();
   const q = question.trim().slice(0, 1000);
   if (!q) return;
   const [existing] = await db

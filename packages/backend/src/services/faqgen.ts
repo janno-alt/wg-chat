@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { db } from '../db/client.js';
+import { tdb } from '../db/client.js';
 import { kbDocuments } from '../db/schema.js';
 import { getProviderForTenant, hasEmbeddings, type TenantLlmCfg } from '../llm/index.js';
 import { recordUsage } from './usage.js';
@@ -28,6 +28,7 @@ export async function generateFaqs(
   if (!hasEmbeddings(llmCfg)) {
     throw new Error('Kein LLM-API-Key konfiguriert – FAQ-Generierung nicht möglich.');
   }
+  const db = tdb();
   const [doc] = await db
     .select()
     .from(kbDocuments)

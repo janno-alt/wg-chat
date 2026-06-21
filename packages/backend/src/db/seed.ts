@@ -1,8 +1,10 @@
 import '../env.js';
 import { eq } from 'drizzle-orm';
-import { db, getPool } from './client.js';
-import { tenants, tenantSettings, kbDocuments, kbChunks, outreachTriggers } from './schema.js';
-import { getProviderForTenant } from '../llm/index.js';
+import { db, getPool, runForTenant } from './client.js';
+import { tenants, outreachTriggers } from './schema.js';
+import { schemaNameFor } from './provision.js';
+import { createTenant, updateTenantSettings } from '../services/tenant.js';
+import { ingestDocument } from '../services/ingestion.js';
 import { getConfig } from '../config.js';
 
 const SITE_KEY = 'demo';
@@ -24,28 +26,31 @@ const TRIGGERS = [
 async function main() {
   console.log('▶ Seede Demo-Tenant …');
 
-  // Sauberer Reseed: vorhandenen Demo-Tenant samt Kind-Daten entfernen (CASCADE).
-  await db.delete(tenants).where(eq(tenants.siteKey, SITE_KEY));
+  // Sauberer Reseed: alten Demo-Tenant samt eigenem Schema entfernen.
+  const [old] = await db
+    .select({ id: tenants.id, schemaName: tenants.schemaName })
+    .from(tenants)
+    .where(eq(tenants.siteKey, SITE_KEY));
+  if (old) {
+    if (old.schemaName) await getPool().query(`DROP SCHEMA IF EXISTS "${old.schemaName}" CASCADE`);
+    await db.delete(tenants).where(eq(tenants.id, old.id));
+  }
 
-  const [tenant] = await db
-    .insert(tenants)
-    .values({
-      name: 'Demo GmbH',
-      siteKey: SITE_KEY,
-      allowedDomains: [],
-      monthlyBudgetEur: '25.00',
-    })
-    .returning();
-  const tenantId = tenant!.id;
+  // Tenant anlegen (legt automatisch das eigene Schema an + Default-Einstellungen).
+  const { id } = await createTenant({
+    name: 'Demo GmbH',
+    siteKey: SITE_KEY,
+    allowedDomains: [],
+    monthlyBudgetEur: 25,
+  });
 
-  await db.insert(tenantSettings).values({
-    tenantId,
-    locale: 'de',
+  await updateTenantSettings(id, {
     greeting: 'Hallo! 👋 Ich beantworte gern Fragen zu unseren Leistungen.',
     theme: {
       primaryColor: '#0f766e',
       bubbleColor: '#0f766e',
       textColor: '#ffffff',
+      backgroundColor: '#f7f8fa',
       position: 'bottom-right',
     },
     starterButtons: [
@@ -55,48 +60,29 @@ async function main() {
     ],
   });
 
-  const docIds: string[] = [];
-  for (const f of FAQ) {
-    const [doc] = await db
-      .insert(kbDocuments)
-      .values({
-        tenantId,
+  // Outreach-Trigger (public)
+  for (const tr of TRIGGERS) {
+    await db.insert(outreachTriggers).values({ tenantId: id, ...tr });
+  }
+
+  // FAQ-Wissensbasis im Kunden-Schema anlegen (ingestDocument embeddet bei API-Key).
+  const withEmbeddings = Boolean(getConfig().MISTRAL_API_KEY);
+  await runForTenant(schemaNameFor(id), async () => {
+    for (const f of FAQ) {
+      await ingestDocument(id, {
         sourceType: 'faq',
         title: f.q,
-        rawContent: f.q,
+        content: `${f.q}\n${f.a}`,
         canonicalAnswer: f.a,
         status: 'published',
-      })
-      .returning();
-    docIds.push(doc!.id);
-  }
-
-  for (const tr of TRIGGERS) {
-    await db.insert(outreachTriggers).values({ tenantId, ...tr });
-  }
-
-  // Embeddings nur, wenn ein API-Key vorhanden ist – sonst läuft der Seed offline
-  // (FAQ-Keyword-Stufe + Eskalation funktionieren ohnehin ohne Embeddings).
-  if (getConfig().MISTRAL_API_KEY) {
-    console.log('▶ Erzeuge Embeddings für die FAQ-Wissensbasis …');
-    const provider = getProviderForTenant(tenant!.llmProviderCfg);
-    const texts = FAQ.map((f) => `${f.q}\n${f.a}`);
-    const { embeddings } = await provider.embed(texts);
-    for (let i = 0; i < FAQ.length; i++) {
-      await db.insert(kbChunks).values({
-        tenantId,
-        documentId: docIds[i]!,
-        content: texts[i]!,
-        embedding: embeddings[i]!,
-        metadata: { source: 'seed-faq' },
       });
     }
-    console.log(`✓ ${embeddings.length} Embeddings gespeichert.`);
-  } else {
-    console.log('ℹ Kein MISTRAL_API_KEY – Embeddings übersprungen (FAQ-Stufe bleibt aktiv).');
-  }
+  });
 
-  console.log(`✓ Demo-Tenant angelegt. site_key="${SITE_KEY}", id=${tenantId}`);
+  console.log(
+    `✓ Demo-Tenant angelegt. site_key="${SITE_KEY}", id=${id}, schema=${schemaNameFor(id)}` +
+      (withEmbeddings ? ' (inkl. Embeddings)' : ' (ohne Embeddings – kein MISTRAL_API_KEY)'),
+  );
   await getPool().end();
 }
 

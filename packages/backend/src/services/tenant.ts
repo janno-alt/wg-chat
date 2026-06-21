@@ -3,12 +3,14 @@ import { randomUUID } from 'node:crypto';
 import type { WidgetConfig, QuickReply, OutreachTrigger } from '@wg-chat/shared';
 import { db } from '../db/client.js';
 import { tenants, tenantSettings, outreachTriggers } from '../db/schema.js';
+import { provisionSchema, schemaNameFor } from '../db/provision.js';
 import { getConfig } from '../config.js';
 
 export interface ResolvedTenant {
   id: string;
   name: string;
   siteKey: string;
+  schemaName: string | null;
   allowedDomains: string[];
   active: boolean;
   monthlyBudgetEur: number | null;
@@ -39,6 +41,7 @@ export async function resolveTenantBySiteKey(siteKey: string): Promise<ResolvedT
     id: t.id,
     name: t.name,
     siteKey: t.siteKey,
+    schemaName: t.schemaName ?? null,
     allowedDomains: t.allowedDomains ?? [],
     active: t.active,
     monthlyBudgetEur: t.monthlyBudgetEur === null ? null : Number(t.monthlyBudgetEur),
@@ -99,6 +102,11 @@ export async function createTenant(input: NewTenant): Promise<{ id: string; site
       plan: input.plan ?? 'standard',
     })
     .returning();
+  // Eigenes Schema für diesen Kunden anlegen (Isolation) + verknüpfen.
+  const schema = schemaNameFor(t!.id);
+  await provisionSchema(schema);
+  await db.update(tenants).set({ schemaName: schema }).where(eq(tenants.id, t!.id));
+
   await db.insert(tenantSettings).values({ tenantId: t!.id }).onConflictDoNothing();
   return { id: t!.id, siteKey };
 }

@@ -1,5 +1,5 @@
 import { and, desc, eq } from 'drizzle-orm';
-import { db } from '../db/client.js';
+import { tdb } from '../db/client.js';
 import { conversations, leads } from '../db/schema.js';
 import type { ResolvedTenant } from './tenant.js';
 import { sendLeadEmail, sendLeadWebhook, type LeadRecord } from './notify.js';
@@ -15,6 +15,7 @@ export interface NewLead {
 
 /** Lead persistieren und – falls vorhanden – die Konversation als „Lead erfasst" markieren. */
 export async function createLead(tenant: ResolvedTenant, input: NewLead): Promise<LeadRecord> {
+  const db = tdb();
   const [lead] = await db
     .insert(leads)
     .values({
@@ -46,6 +47,7 @@ export async function dispatchLeadNotifications(
   lead: LeadRecord,
   log: (msg: string) => void = () => {},
 ): Promise<void> {
+  const db = tdb();
   const [webhook, email] = await Promise.allSettled([
     sendLeadWebhook(tenant, lead),
     sendLeadEmail(tenant, lead),
@@ -62,7 +64,7 @@ export async function dispatchLeadNotifications(
 }
 
 export async function listLeads(tenantId: string) {
-  return db
+  return tdb()
     .select()
     .from(leads)
     .where(eq(leads.tenantId, tenantId))

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { db } from '../db/client.js';
+import { tdb } from '../db/client.js';
 
 /** pgvector erwartet das Literal "[a,b,c]"; hier zentral serialisiert. */
 export function toVectorLiteral(embedding: number[]): string {
@@ -25,6 +25,7 @@ export async function searchChunks(
   embedding: number[],
   limit = 4,
 ): Promise<ChunkHit[]> {
+  const db = tdb();
   const vec = toVectorLiteral(embedding);
   const result = await db.execute(sql`
     SELECT c.id AS chunk_id,
@@ -66,6 +67,7 @@ export async function searchCache(
   tenantId: string,
   embedding: number[],
 ): Promise<CacheHit | null> {
+  const db = tdb();
   const vec = toVectorLiteral(embedding);
   const result = await db.execute(sql`
     SELECT m.content,

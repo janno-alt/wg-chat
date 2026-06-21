@@ -1,6 +1,6 @@
 import { and, asc, desc, eq } from 'drizzle-orm';
 import type { AnswerSource } from '@wg-chat/shared';
-import { db } from '../db/client.js';
+import { tdb } from '../db/client.js';
 import { conversations, messages } from '../db/schema.js';
 
 export interface ConversationRow {
@@ -10,13 +10,14 @@ export interface ConversationRow {
   handedOff: boolean;
 }
 
-/** Bestehende Konversation laden oder neu anlegen (tenant-gescoped). */
+/** Bestehende Konversation laden oder neu anlegen (tenant-isoliertes Schema via tdb()). */
 export async function getOrCreateConversation(params: {
   tenantId: string;
   sessionId: string;
   conversationId?: string;
   pageUrl?: string;
 }): Promise<ConversationRow> {
+  const db = tdb();
   if (params.conversationId) {
     const [existing] = await db
       .select()
@@ -53,7 +54,7 @@ export async function getOrCreateConversation(params: {
 }
 
 export async function addUserMessage(conversationId: string, content: string): Promise<void> {
-  await db.insert(messages).values({ conversationId, role: 'user', content });
+  await tdb().insert(messages).values({ conversationId, role: 'user', content });
 }
 
 /**
@@ -66,7 +67,7 @@ export async function addBotMessage(params: {
   source: AnswerSource;
   queryEmbedding?: number[] | null;
 }): Promise<void> {
-  await db.insert(messages).values({
+  await tdb().insert(messages).values({
     conversationId: params.conversationId,
     role: 'bot',
     content: params.content,
@@ -77,7 +78,7 @@ export async function addBotMessage(params: {
 }
 
 export async function markEscalated(conversationId: string): Promise<void> {
-  await db
+  await tdb()
     .update(conversations)
     .set({ status: 'escalated' })
     .where(eq(conversations.id, conversationId));
@@ -85,7 +86,7 @@ export async function markEscalated(conversationId: string): Promise<void> {
 
 /** Einzelne Konversation (tenant-gescoped) oder null. */
 export async function getConversation(tenantId: string, conversationId: string) {
-  const [c] = await db
+  const [c] = await tdb()
     .select()
     .from(conversations)
     .where(and(eq(conversations.id, conversationId), eq(conversations.tenantId, tenantId)));
@@ -98,7 +99,7 @@ export async function setHandedOff(
   conversationId: string,
   value: boolean,
 ): Promise<void> {
-  await db
+  await tdb()
     .update(conversations)
     .set({ handedOff: value })
     .where(and(eq(conversations.id, conversationId), eq(conversations.tenantId, tenantId)));
@@ -106,12 +107,14 @@ export async function setHandedOff(
 
 /** Nachricht eines menschlichen Agenten speichern. */
 export async function addAgentMessage(conversationId: string, content: string): Promise<void> {
-  await db.insert(messages).values({ conversationId, role: 'agent', content, answerSource: 'human' });
+  await tdb()
+    .insert(messages)
+    .values({ conversationId, role: 'agent', content, answerSource: 'human' });
 }
 
 /** Jüngste Konversationen eines Tenants (fürs Dashboard). */
 export async function listConversations(tenantId: string) {
-  return db
+  return tdb()
     .select({
       id: conversations.id,
       sessionId: conversations.sessionId,
@@ -129,6 +132,7 @@ export async function listConversations(tenantId: string) {
 
 /** Vollständiges Transkript einer Konversation (tenant-gescoped). */
 export async function getTranscript(tenantId: string, conversationId: string) {
+  const db = tdb();
   const [conv] = await db
     .select()
     .from(conversations)

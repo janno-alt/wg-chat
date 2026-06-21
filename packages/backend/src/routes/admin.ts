@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { and, desc, eq } from 'drizzle-orm';
-import { db } from '../db/client.js';
+import { runForTenant, tdb } from '../db/client.js';
 import { knowledgeGaps } from '../db/schema.js';
 import { getConfig } from '../config.js';
 import {
@@ -29,13 +29,12 @@ import {
 import { generateFaqs } from '../services/faqgen.js';
 
 /**
- * Gesicherte Admin-/Ingestion-API (Header `x-admin-key` === ADMIN_API_KEY).
- * Brücke bis zum Web-Dashboard (Phase 5) und Andockpunkt für den MCP-Server
- * (Phase 6). Als eigenes Plugin registriert → der Auth-Hook gilt nur hier.
+ * Gesicherte Admin-API. Zugang per Dashboard-Session-Cookie ODER x-admin-key (MCP).
+ * Control-Plane-Endpunkte (tenants, settings) laufen in `public`; Daten-Endpunkte
+ * (KB, Konversationen, Leads, Gaps, Kosten) laufen via inTenant() im Kunden-Schema.
  */
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', async (req, reply) => {
-    // Zugang per Dashboard-Session-Cookie ODER per x-admin-key (für den MCP-Server).
     const key = getConfig().ADMIN_API_KEY;
     if (key && req.headers['x-admin-key'] === key) return;
     const user = await getSessionUser(req);
@@ -52,7 +51,16 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return t;
   };
 
-  // ── Tenants (Agentur-weit) ──
+  /** Führt einen Daten-Handler im Schema des Kunden aus (Isolation). */
+  function inTenant<T>(t: ResolvedTenant, reply: FastifyReply, fn: () => Promise<T>) {
+    if (!t.schemaName) {
+      reply.code(503);
+      return Promise.resolve({ error: 'not_provisioned', message: 'Tenant ist noch nicht eingerichtet.' });
+    }
+    return runForTenant(t.schemaName, fn);
+  }
+
+  // ── Tenants (Control-Plane, public) ──
   app.get('/tenants', async () => ({ tenants: await listTenants() }));
 
   const newTenantSchema = z.object({
@@ -89,14 +97,13 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
-  // ── KB lesen ──
+  // ── Wissensbasis (Daten-Plane, Kunden-Schema) ──
   app.get<{ Params: { siteKey: string } }>('/:siteKey/kb', async (req, reply) => {
     const t = await tenantOr404(req.params.siteKey, reply);
     if (!t) return;
-    return { documents: await listDocuments(t.id) };
+    return inTenant(t, reply, async () => ({ documents: await listDocuments(t.id) }));
   });
 
-  // ── Manuelles Dokument / FAQ ──
   const manualSchema = z.object({
     sourceType: z.enum(['manual', 'faq']).default('manual'),
     title: z.string().max(500).optional(),
@@ -108,123 +115,118 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const t = await tenantOr404(req.params.siteKey, reply);
     if (!t) return;
     const body = manualSchema.parse(req.body);
-    return ingestDocument(t.id, { ...body, llmCfg: t.llmProviderCfg });
+    return inTenant(t, reply, () => ingestDocument(t.id, { ...body, llmCfg: t.llmProviderCfg }));
   });
 
-  // ── Einzelne URL ──
   app.post<{ Params: { siteKey: string } }>('/:siteKey/kb/url', async (req, reply) => {
     const t = await tenantOr404(req.params.siteKey, reply);
     if (!t) return;
     const { url } = z.object({ url: z.string().url() }).parse(req.body);
-    try {
-      return await ingestUrl(t.id, url, t.llmProviderCfg);
-    } catch (err) {
-      reply.code(422);
-      return { error: 'ingest_failed', message: (err as Error).message };
-    }
+    return inTenant(t, reply, async () => {
+      try {
+        return await ingestUrl(t.id, url, t.llmProviderCfg);
+      } catch (err) {
+        reply.code(422);
+        return { error: 'ingest_failed', message: (err as Error).message };
+      }
+    });
   });
 
-  // ── Website crawlen ──
   app.post<{ Params: { siteKey: string } }>('/:siteKey/kb/crawl', async (req, reply) => {
     const t = await tenantOr404(req.params.siteKey, reply);
     if (!t) return;
     const cfg = getConfig();
     const { startUrl, maxPages } = z
-      .object({
-        startUrl: z.string().url(),
-        maxPages: z.coerce.number().int().min(1).max(200).optional(),
-      })
+      .object({ startUrl: z.string().url(), maxPages: z.coerce.number().int().min(1).max(200).optional() })
       .parse(req.body);
-    return crawlAndIngest(t.id, startUrl, maxPages ?? cfg.CRAWL_MAX_PAGES, t.llmProviderCfg);
+    return inTenant(t, reply, () =>
+      crawlAndIngest(t.id, startUrl, maxPages ?? cfg.CRAWL_MAX_PAGES, t.llmProviderCfg),
+    );
   });
 
-  // ── Reindex ──
-  app.post<{ Params: { siteKey: string; docId: string } }>(
-    '/:siteKey/kb/:docId/reindex',
-    async (req, reply) => {
-      const t = await tenantOr404(req.params.siteKey, reply);
-      if (!t) return;
+  app.post<{ Params: { siteKey: string; docId: string } }>('/:siteKey/kb/:docId/reindex', async (req, reply) => {
+    const t = await tenantOr404(req.params.siteKey, reply);
+    if (!t) return;
+    return inTenant(t, reply, async () => {
       const res = await reindexDocument(t.id, req.params.docId, t.llmProviderCfg);
       if (!res) {
         reply.code(404);
         return { error: 'not_found', message: 'Dokument nicht gefunden.' };
       }
       return res;
-    },
-  );
+    });
+  });
 
-  // ── Entwurf freigeben (publish + embed) ──
-  app.post<{ Params: { siteKey: string; docId: string } }>(
-    '/:siteKey/kb/:docId/publish',
-    async (req, reply) => {
-      const t = await tenantOr404(req.params.siteKey, reply);
-      if (!t) return;
+  app.post<{ Params: { siteKey: string; docId: string } }>('/:siteKey/kb/:docId/publish', async (req, reply) => {
+    const t = await tenantOr404(req.params.siteKey, reply);
+    if (!t) return;
+    return inTenant(t, reply, async () => {
       const res = await publishDocument(t.id, req.params.docId, t.llmProviderCfg);
       if (!res) {
         reply.code(404);
         return { error: 'not_found', message: 'Dokument nicht gefunden.' };
       }
       return res;
-    },
-  );
+    });
+  });
 
-  // ── KI-FAQ-Generierung (Entwürfe) ──
-  app.post<{ Params: { siteKey: string; docId: string } }>(
-    '/:siteKey/kb/:docId/faqgen',
-    async (req, reply) => {
-      const t = await tenantOr404(req.params.siteKey, reply);
-      if (!t) return;
-      const { count } = z.object({ count: z.coerce.number().int().min(1).max(20).optional() }).parse(req.body ?? {});
+  app.post<{ Params: { siteKey: string; docId: string } }>('/:siteKey/kb/:docId/faqgen', async (req, reply) => {
+    const t = await tenantOr404(req.params.siteKey, reply);
+    if (!t) return;
+    const { count } = z.object({ count: z.coerce.number().int().min(1).max(20).optional() }).parse(req.body ?? {});
+    return inTenant(t, reply, async () => {
       try {
         return await generateFaqs(t.id, req.params.docId, count ?? 5, t.llmProviderCfg);
       } catch (err) {
         reply.code(422);
         return { error: 'faqgen_failed', message: (err as Error).message };
       }
-    },
-  );
+    });
+  });
 
-  // ── Dokument löschen ──
-  app.delete<{ Params: { siteKey: string; docId: string } }>(
-    '/:siteKey/kb/:docId',
-    async (req, reply) => {
-      const t = await tenantOr404(req.params.siteKey, reply);
-      if (!t) return;
+  app.delete<{ Params: { siteKey: string; docId: string } }>('/:siteKey/kb/:docId', async (req, reply) => {
+    const t = await tenantOr404(req.params.siteKey, reply);
+    if (!t) return;
+    return inTenant(t, reply, async () => {
       const ok = await deleteDocument(t.id, req.params.docId);
       if (!ok) {
         reply.code(404);
         return { error: 'not_found', message: 'Dokument nicht gefunden.' };
       }
       return { deleted: true };
-    },
-  );
+    });
+  });
 
   // ── Kostenübersicht (pro Kunde) ──
   app.get<{ Params: { siteKey: string } }>('/:siteKey/usage', async (req, reply) => {
     const t = await tenantOr404(req.params.siteKey, reply);
     if (!t) return;
-    return { tenant: t.name, budgetEur: t.monthlyBudgetEur, ...(await getUsageSummary(t.id)) };
+    return inTenant(t, reply, async () => ({
+      tenant: t.name,
+      budgetEur: t.monthlyBudgetEur,
+      ...(await getUsageSummary()),
+    }));
   });
 
   // ── Wissenslücken ──
   app.get<{ Params: { siteKey: string } }>('/:siteKey/gaps', async (req, reply) => {
     const t = await tenantOr404(req.params.siteKey, reply);
     if (!t) return;
-    const gaps = await db
-      .select()
-      .from(knowledgeGaps)
-      .where(and(eq(knowledgeGaps.tenantId, t.id), eq(knowledgeGaps.status, 'open')))
-      .orderBy(desc(knowledgeGaps.frequency))
-      .limit(100);
-    return { gaps };
+    return inTenant(t, reply, async () => {
+      const gaps = await tdb()
+        .select()
+        .from(knowledgeGaps)
+        .where(and(eq(knowledgeGaps.tenantId, t.id), eq(knowledgeGaps.status, 'open')))
+        .orderBy(desc(knowledgeGaps.frequency))
+        .limit(100);
+      return { gaps };
+    });
   });
 
-  // ── KI-Antwortvorschlag für eine Wissenslücke (RAG über die KB) ──
-  app.post<{ Params: { siteKey: string; gapId: string } }>(
-    '/:siteKey/gaps/:gapId/suggest',
-    async (req, reply) => {
-      const t = await tenantOr404(req.params.siteKey, reply);
-      if (!t) return;
+  app.post<{ Params: { siteKey: string; gapId: string } }>('/:siteKey/gaps/:gapId/suggest', async (req, reply) => {
+    const t = await tenantOr404(req.params.siteKey, reply);
+    if (!t) return;
+    return inTenant(t, reply, async () => {
       try {
         const res = await suggestGapAnswer(t.id, req.params.gapId, t.llmProviderCfg);
         if (!res) {
@@ -236,17 +238,17 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         reply.code(422);
         return { error: 'suggest_failed', message: (err as Error).message };
       }
-    },
-  );
+    });
+  });
 
-  // ── Leads (Phase 4) ──
+  // ── Leads ──
   app.get<{ Params: { siteKey: string } }>('/:siteKey/leads', async (req, reply) => {
     const t = await tenantOr404(req.params.siteKey, reply);
     if (!t) return;
-    return { leads: await listLeads(t.id) };
+    return inTenant(t, reply, async () => ({ leads: await listLeads(t.id) }));
   });
 
-  // ── Tenant-Einstellungen aktualisieren (Theme, Begrüßung, Lead-Ziele …) ──
+  // ── Tenant-Einstellungen (Control-Plane, public) ──
   const settingsSchema = z.object({
     locale: z.string().max(8).optional(),
     greeting: z.string().max(1000).optional(),
@@ -280,24 +282,23 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
-  // ── Konversationen + Transkript ──
+  // ── Konversationen + Transkript (Daten-Plane) ──
   app.get<{ Params: { siteKey: string } }>('/:siteKey/conversations', async (req, reply) => {
     const t = await tenantOr404(req.params.siteKey, reply);
     if (!t) return;
-    return { conversations: await listConversations(t.id) };
+    return inTenant(t, reply, async () => ({ conversations: await listConversations(t.id) }));
   });
 
-  app.get<{ Params: { siteKey: string; id: string } }>(
-    '/:siteKey/conversations/:id',
-    async (req, reply) => {
-      const t = await tenantOr404(req.params.siteKey, reply);
-      if (!t) return;
+  app.get<{ Params: { siteKey: string; id: string } }>('/:siteKey/conversations/:id', async (req, reply) => {
+    const t = await tenantOr404(req.params.siteKey, reply);
+    if (!t) return;
+    return inTenant(t, reply, async () => {
       const transcript = await getTranscript(t.id, req.params.id);
       if (!transcript) {
         reply.code(404);
         return { error: 'not_found', message: 'Konversation nicht gefunden.' };
       }
       return transcript;
-    },
-  );
+    });
+  });
 }

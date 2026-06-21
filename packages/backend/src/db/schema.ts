@@ -40,6 +40,8 @@ export const tenants = pgTable('tenants', {
   // Origin-Whitelist; leer + ALLOW_ALL_ORIGINS=false => alles blockiert
   allowedDomains: jsonb('allowed_domains').$type<string[]>().notNull().default([]),
   plan: varchar('plan', { length: 32 }).notNull().default('standard'),
+  // eigenes Postgres-Schema für die Daten dieses Kunden (Isolation, Phase 8b)
+  schemaName: text('schema_name'),
   // monatliches Budget in EUR für LLM-/Embedding-Kosten; null = unbegrenzt
   monthlyBudgetEur: numeric('monthly_budget_eur', { precision: 10, scale: 2 }),
   // pro-Tenant Provider-/Modell-Overrides (überschreiben globale ENV-Defaults)

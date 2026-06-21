@@ -1,9 +1,9 @@
 import { and, eq, gte, sql } from 'drizzle-orm';
-import { db } from '../db/client.js';
-import { llmUsage, tenants } from '../db/schema.js';
+import { tdb } from '../db/client.js';
+import { llmUsage } from '../db/schema.js';
 import { estimateCostEur, type UsageStat } from '../llm/provider.js';
 
-/** Schreibt eine Kosten-Zeile (Token + EUR-Schätzung) – Basis der Pro-Kunde-Kostenübersicht. */
+/** Schreibt eine Kosten-Zeile (Token + EUR-Schätzung) ins Tenant-Schema. */
 export async function recordUsage(params: {
   tenantId: string;
   conversationId?: string | null;
@@ -13,7 +13,7 @@ export async function recordUsage(params: {
   usage: UsageStat;
 }): Promise<number> {
   const costEur = estimateCostEur(params.model, params.usage);
-  await db.insert(llmUsage).values({
+  await tdb().insert(llmUsage).values({
     tenantId: params.tenantId,
     conversationId: params.conversationId ?? null,
     provider: params.provider,
@@ -26,13 +26,13 @@ export async function recordUsage(params: {
   return costEur;
 }
 
-/** Summe der LLM-Kosten des laufenden Kalendermonats (EUR) für einen Tenant. */
-export async function getMonthSpendEur(tenantId: string): Promise<number> {
+/** Summe der LLM-Kosten des laufenden Kalendermonats (EUR) im Tenant-Schema. */
+export async function getMonthSpendEur(): Promise<number> {
   const startOfMonth = sql`date_trunc('month', now())`;
-  const [row] = await db
+  const [row] = await tdb()
     .select({ total: sql<string>`coalesce(sum(${llmUsage.costEur}), 0)` })
     .from(llmUsage)
-    .where(and(eq(llmUsage.tenantId, tenantId), gte(llmUsage.createdAt, startOfMonth)));
+    .where(gte(llmUsage.createdAt, startOfMonth));
   return Number(row?.total ?? 0);
 }
 
@@ -49,9 +49,9 @@ export interface UsageSummary {
 }
 
 /** Kostenübersicht des laufenden Monats pro Modell/Zweck – fürs Pro-Kunde-Reporting. */
-export async function getUsageSummary(tenantId: string): Promise<UsageSummary> {
+export async function getUsageSummary(): Promise<UsageSummary> {
   const startOfMonth = sql`date_trunc('month', now())`;
-  const rows = await db
+  const rows = await tdb()
     .select({
       model: llmUsage.model,
       purpose: llmUsage.purpose,
@@ -61,10 +61,10 @@ export async function getUsageSummary(tenantId: string): Promise<UsageSummary> {
       eur: sql<string>`coalesce(sum(${llmUsage.costEur}),0)`,
     })
     .from(llmUsage)
-    .where(and(eq(llmUsage.tenantId, tenantId), gte(llmUsage.createdAt, startOfMonth)))
+    .where(gte(llmUsage.createdAt, startOfMonth))
     .groupBy(llmUsage.model, llmUsage.purpose);
 
-  const monthEur = await getMonthSpendEur(tenantId);
+  const monthEur = await getMonthSpendEur();
   return {
     monthEur,
     byModel: rows.map((r) => ({
@@ -79,17 +79,14 @@ export async function getUsageSummary(tenantId: string): Promise<UsageSummary> {
 }
 
 /**
- * Darf für diesen Tenant noch eine (teure) Generierung erfolgen?
- * Kein Budget gesetzt => unbegrenzt. Sonst Monatsausgabe < Budget.
+ * Darf noch eine (teure) Generierung erfolgen? Budget kommt aus dem (public)
+ * Tenant-Datensatz; Monatsausgabe aus dem Tenant-Schema.
+ * Kein/0 Budget => unbegrenzt.
  */
-export async function canGenerate(tenantId: string): Promise<boolean> {
-  const [t] = await db
-    .select({ budget: tenants.monthlyBudgetEur })
-    .from(tenants)
-    .where(eq(tenants.id, tenantId));
-  if (!t || t.budget === null || t.budget === undefined) return true;
-  const budget = Number(t.budget);
-  if (!Number.isFinite(budget) || budget <= 0) return true;
-  const spent = await getMonthSpendEur(tenantId);
-  return spent < budget;
+export async function canGenerate(monthlyBudgetEur: number | null): Promise<boolean> {
+  if (monthlyBudgetEur === null || !Number.isFinite(monthlyBudgetEur) || monthlyBudgetEur <= 0) {
+    return true;
+  }
+  const spent = await getMonthSpendEur();
+  return spent < monthlyBudgetEur;
 }

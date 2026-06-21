@@ -4,6 +4,7 @@ import type { ChatResponse } from '@wg-chat/shared';
 import { isOriginAllowed, resolveTenantBySiteKey } from '../services/tenant.js';
 import { runCascade } from '../services/cascade.js';
 import { hub } from '../services/hub.js';
+import { runForTenant } from '../db/client.js';
 
 const bodySchema = z.object({
   sessionId: z.string().min(1).max(64),
@@ -37,10 +38,14 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
       reply.code(403);
       return { error: 'origin_not_allowed', message: 'Diese Domain ist nicht freigegeben.' };
     }
+    if (!tenant.schemaName) {
+      reply.code(503);
+      return { error: 'not_provisioned', message: 'Tenant ist noch nicht eingerichtet.' };
+    }
 
     try {
-      const result: ChatResponse = await runCascade(tenant, parsed.data, (m) =>
-        req.log.info({ tenant: tenant.siteKey }, `[cascade] ${m}`),
+      const result: ChatResponse = await runForTenant(tenant.schemaName, () =>
+        runCascade(tenant, parsed.data, (m) => req.log.info({ tenant: tenant.siteKey }, `[cascade] ${m}`)),
       );
 
       // Live-Sichtbarkeit für Agenten: eingehende Besuchernachricht + (ggf.) Bot-Antwort

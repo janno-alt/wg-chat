@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { db } from '../db/client.js';
+import { tdb } from '../db/client.js';
 import { knowledgeGaps } from '../db/schema.js';
 import { getProviderForTenant, hasEmbeddings, type TenantLlmCfg } from '../llm/index.js';
 import { recordUsage } from './usage.js';
@@ -20,6 +20,7 @@ export async function suggestGapAnswer(
   gapId: string,
   llmCfg: TenantLlmCfg = {},
 ): Promise<GapSuggestion | null> {
+  const db = tdb();
   const [gap] = await db
     .select()
     .from(knowledgeGaps)

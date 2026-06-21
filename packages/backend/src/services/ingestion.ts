@@ -1,5 +1,5 @@
 import { and, desc, eq } from 'drizzle-orm';
-import { db } from '../db/client.js';
+import { tdb } from '../db/client.js';
 import { kbChunks, kbDocuments } from '../db/schema.js';
 import { getConfig } from '../config.js';
 import { getProviderForTenant, hasEmbeddings, type TenantLlmCfg } from '../llm/index.js';
@@ -32,6 +32,7 @@ async function embedAndStore(
   const chunks = chunkText(text, { maxChars: cfg.CHUNK_MAX_CHARS, overlap: cfg.CHUNK_OVERLAP });
   if (!chunks.length) return 0;
 
+  const db = tdb();
   const provider = getProviderForTenant(llmCfg);
   let inserted = 0;
   for (const group of batch(chunks, 64)) {
@@ -68,6 +69,7 @@ export interface IngestInput {
 
 /** Dokument anlegen + (falls Key vorhanden) chunken/embedden. */
 export async function ingestDocument(tenantId: string, input: IngestInput): Promise<IngestResult> {
+  const db = tdb();
   const [doc] = await db
     .insert(kbDocuments)
     .values({
@@ -98,6 +100,7 @@ export async function reindexDocument(
   documentId: string,
   llmCfg: TenantLlmCfg = {},
 ): Promise<IngestResult | null> {
+  const db = tdb();
   const [doc] = await db
     .select()
     .from(kbDocuments)
@@ -170,6 +173,7 @@ export async function publishDocument(
   documentId: string,
   llmCfg: TenantLlmCfg = {},
 ): Promise<IngestResult | null> {
+  const db = tdb();
   const updated = await db
     .update(kbDocuments)
     .set({ status: 'published' })
@@ -180,7 +184,7 @@ export async function publishDocument(
 }
 
 export async function listDocuments(tenantId: string) {
-  return db
+  return tdb()
     .select({
       id: kbDocuments.id,
       sourceType: kbDocuments.sourceType,
@@ -195,7 +199,7 @@ export async function listDocuments(tenantId: string) {
 }
 
 export async function deleteDocument(tenantId: string, documentId: string): Promise<boolean> {
-  const deleted = await db
+  const deleted = await tdb()
     .delete(kbDocuments)
     .where(and(eq(kbDocuments.id, documentId), eq(kbDocuments.tenantId, tenantId)))
     .returning({ id: kbDocuments.id });
