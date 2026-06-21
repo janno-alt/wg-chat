@@ -43,11 +43,16 @@ export function dbForTenant(schemaName: string): Db {
     const cfg = getConfig();
     const pool = new Pool({
       connectionString: cfg.DATABASE_URL,
+      // `options` setzt den search_path beim Verbindungsaufbau – funktioniert aber
+      // nicht überall (z.B. hinter manchen Poolern/Managed-DBs). Deshalb setzen wir
+      // ihn unten zusätzlich explizit per SET (zuverlässig, pipelined vor App-Queries).
       options: `-c search_path=${schemaName},public`,
       max: 3,
       idleTimeoutMillis: 30_000,
     });
     pool.on('connect', (client) => {
+      // schemaName ist durch die Regex oben validiert → sicher zu interpolieren.
+      client.query(`SET search_path TO "${schemaName}", public`).catch(() => {});
       client.query(`SET hnsw.ef_search = ${Number(cfg.HNSW_EF_SEARCH)}`).catch(() => {});
     });
     d = drizzle(pool, { schema });
