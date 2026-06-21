@@ -8,6 +8,8 @@ export function WidgetPreview({
   primary,
   bubble,
   textColor,
+  background,
+  launcherIcon,
   position,
   buttons,
 }: {
@@ -16,9 +18,12 @@ export function WidgetPreview({
   primary: string;
   bubble: string;
   textColor: string;
+  background: string;
+  launcherIcon?: string;
   position: 'bottom-right' | 'bottom-left';
   buttons: string[];
 }) {
+  const bg = background || '#f7f8fa';
   const right = position !== 'bottom-left';
   const panelSide = right ? { right: 14 } : { left: 14 };
   const launcherSide = right ? { right: 16 } : { left: 16 };
@@ -71,7 +76,7 @@ export function WidgetPreview({
           <span style={{ opacity: 0.85 }}>×</span>
         </div>
 
-        <div style={{ padding: 12, background: '#f7f8fa', display: 'flex', flexDirection: 'column', gap: 8, minHeight: 80 }}>
+        <div style={{ padding: 12, background: bg, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 80 }}>
           <div
             style={{
               alignSelf: 'flex-start',
@@ -90,7 +95,7 @@ export function WidgetPreview({
         </div>
 
         {buttons.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 12px 10px', background: '#f7f8fa' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 12px 10px', background: bg }}>
             {buttons.slice(0, 4).map((b, i) => (
               <span
                 key={i}
@@ -141,9 +146,14 @@ export function WidgetPreview({
           fontSize: 24,
           boxShadow: '0 6px 20px rgba(0,0,0,.25)',
           ...launcherSide,
+          overflow: 'hidden',
         }}
       >
-        💬
+        {launcherIcon ? (
+          <img src={launcherIcon} alt="" style={{ width: '62%', height: '62%', objectFit: 'contain', borderRadius: 8 }} />
+        ) : (
+          '💬'
+        )}
       </div>
     </div>
   );

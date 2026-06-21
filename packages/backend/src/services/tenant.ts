@@ -182,6 +182,7 @@ const DEFAULT_THEME = {
   primaryColor: '#2563eb',
   bubbleColor: '#2563eb',
   textColor: '#ffffff',
+  backgroundColor: '#f7f8fa',
   position: 'bottom-right' as const,
 };
 

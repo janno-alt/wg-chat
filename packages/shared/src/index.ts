@@ -25,7 +25,10 @@ export interface WidgetTheme {
   primaryColor: string;
   bubbleColor: string;
   textColor: string;
+  /** Hintergrund des Nachrichtenbereichs */
+  backgroundColor?: string;
   position: 'bottom-right' | 'bottom-left';
+  /** eigenes Launcher-Icon (URL oder Data-URL); leer = Standard 💬 */
   launcherIcon?: string;
 }
 

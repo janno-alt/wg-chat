@@ -199,6 +199,7 @@ export function App({ siteKey, apiBase }: Props) {
         ['--kc-primary' as string]: theme.primaryColor,
         ['--kc-bubble' as string]: theme.bubbleColor,
         ['--kc-on-primary' as string]: theme.textColor,
+        ['--kc-bg' as string]: theme.backgroundColor || '#f7f8fa',
       }}
     >
       {!open && teaser && (
@@ -278,7 +279,7 @@ export function App({ siteKey, apiBase }: Props) {
       )}
 
       <button class="kc-launcher" onClick={() => (open ? setOpen(false) : openPanel())} aria-label="Chat öffnen">
-        {open ? '×' : '💬'}
+        {open ? '×' : theme.launcherIcon ? <img class="kc-launcher-img" src={theme.launcherIcon} alt="" /> : '💬'}
       </button>
     </div>
   );

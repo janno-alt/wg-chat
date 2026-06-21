@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ChangeEvent } from 'react';
 import type { Api } from '../api.js';
 import type { SettingsResponse } from '../types.js';
 import { Button, Card, Field, Input, Spinner, ErrorNote, useAsync } from '../components/ui.js';
@@ -14,6 +14,39 @@ export function Settings({ api, siteKey }: { api: Api; siteKey: string }) {
 
 function str(v: unknown, fallback = ''): string {
   return typeof v === 'string' ? v : fallback;
+}
+
+function readDataUrl(file: File): Promise<string> {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result));
+    r.onerror = () => rej(new Error('Datei konnte nicht gelesen werden.'));
+    r.readAsDataURL(file);
+  });
+}
+
+/** Liest ein Bild ein und skaliert Raster-Icons auf max. 128px herunter (kleine Data-URL). SVG bleibt unverändert. */
+async function processIcon(file: File): Promise<string> {
+  if (file.size > 2 * 1024 * 1024) throw new Error('Datei zu groß (max. 2 MB).');
+  const dataUrl = await readDataUrl(file);
+  if (file.type === 'image/svg+xml') return dataUrl;
+  const img = new Image();
+  await new Promise<void>((res, rej) => {
+    img.onload = () => res();
+    img.onerror = () => rej(new Error('Kein gültiges Bild.'));
+    img.src = dataUrl;
+  });
+  const max = 128;
+  const scale = Math.min(1, max / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return dataUrl;
+  ctx.drawImage(img, 0, 0, w, h);
+  return canvas.toDataURL('image/png');
 }
 
 function SettingsForm({
@@ -43,6 +76,8 @@ function SettingsForm({
   const [primary, setPrimary] = useState(str(theme.primaryColor, '#0f766e'));
   const [bubble, setBubble] = useState(str(theme.bubbleColor, '#0f766e'));
   const [textColor, setTextColor] = useState(str(theme.textColor, '#ffffff'));
+  const [background, setBackground] = useState(str(theme.backgroundColor, '#f7f8fa'));
+  const [launcherIcon, setLauncherIcon] = useState(str(theme.launcherIcon, ''));
   const [position, setPosition] = useState<'bottom-right' | 'bottom-left'>(
     str(theme.position, 'bottom-right') === 'bottom-left' ? 'bottom-left' : 'bottom-right',
   );
@@ -68,6 +103,17 @@ function SettingsForm({
     );
   }
 
+  async function onIconChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = ''; // erlaubt erneutes Wählen derselben Datei
+    if (!file) return;
+    try {
+      setLauncherIcon(await processIcon(file));
+    } catch (err) {
+      alert((err as Error)?.message ?? String(err));
+    }
+  }
+
   async function save() {
     setBusy(true);
     setMsg(null);
@@ -83,7 +129,14 @@ function SettingsForm({
         fallbackText: fallback,
         notifyEmail: notifyEmail.trim() || null,
         leadWebhookUrl: webhook.trim() || null,
-        theme: { primaryColor: primary, bubbleColor: bubble, textColor, position },
+        theme: {
+          primaryColor: primary,
+          bubbleColor: bubble,
+          textColor,
+          backgroundColor: background,
+          position,
+          launcherIcon: launcherIcon || null,
+        },
         starterButtons: buttonList.map((label) => ({ label })),
       });
       setMsg('Gespeichert ✓');
@@ -104,6 +157,7 @@ function SettingsForm({
             <Field label="Primärfarbe"><Input type="color" value={primary} onChange={(e) => setPrimary(e.currentTarget.value)} /></Field>
             <Field label="Bubble-Farbe"><Input type="color" value={bubble} onChange={(e) => setBubble(e.currentTarget.value)} /></Field>
             <Field label="Textfarbe"><Input type="color" value={textColor} onChange={(e) => setTextColor(e.currentTarget.value)} /></Field>
+            <Field label="Chat-Hintergrund"><Input type="color" value={background} onChange={(e) => setBackground(e.currentTarget.value)} /></Field>
             <Field label="Position">
               <select
                 value={position}
@@ -114,6 +168,29 @@ function SettingsForm({
                 <option value="bottom-left">unten links</option>
               </select>
             </Field>
+          </div>
+
+          <div className="mt-3 border-t border-slate-100 pt-3">
+            <span className="mb-1 block text-xs font-medium text-slate-500">Launcher-Icon (eigene Datei)</span>
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 text-xl" style={{ background: bubble, color: textColor }}>
+                {launcherIcon ? <img src={launcherIcon} alt="" className="h-[62%] w-[62%] rounded object-contain" /> : '💬'}
+              </div>
+              <div className="space-y-1">
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  onChange={onIconChange}
+                  className="block w-full text-xs text-slate-500 file:mr-2 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-2 file:py-1 file:text-xs hover:file:bg-slate-50"
+                />
+                {launcherIcon && (
+                  <button type="button" onClick={() => setLauncherIcon('')} className="text-xs text-red-600 hover:underline">
+                    Icon entfernen
+                  </button>
+                )}
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">PNG/SVG, quadratisch. Wird auf 128px verkleinert.</p>
           </div>
         </Card>
 
@@ -168,6 +245,8 @@ function SettingsForm({
             primary={primary}
             bubble={bubble}
             textColor={textColor}
+            background={background}
+            launcherIcon={launcherIcon || undefined}
             position={position}
             buttons={buttonList}
           />
