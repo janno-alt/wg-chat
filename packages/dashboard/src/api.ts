@@ -1,7 +1,9 @@
 import type {
+  Chunk,
   Gap,
   KbDoc,
   Lead,
+  SearchResult,
   SettingsResponse,
   Tenant,
   Transcript,
@@ -30,6 +32,8 @@ export interface Api {
   patchTenant(siteKey: string, patch: Record<string, unknown>): Promise<void>;
 
   listKb(siteKey: string): Promise<KbDoc[]>;
+  listChunks(siteKey: string, docId: string): Promise<Chunk[]>;
+  searchKb(siteKey: string, query: string): Promise<SearchResult>;
   addManual(siteKey: string, body: Record<string, unknown>): Promise<unknown>;
   ingestUrl(siteKey: string, url: string): Promise<unknown>;
   crawl(siteKey: string, startUrl: string, maxPages: number): Promise<unknown>;
@@ -94,6 +98,12 @@ export function createApi(baseUrl = ''): Api {
 
     async listKb(siteKey) {
       return (await admin<{ documents: KbDoc[] }>('GET', `/${siteKey}/kb`)).documents;
+    },
+    async listChunks(siteKey, docId) {
+      return (await admin<{ chunks: Chunk[] }>('GET', `/${siteKey}/kb/${docId}/chunks`)).chunks;
+    },
+    searchKb(siteKey, query) {
+      return admin('POST', `/${siteKey}/kb/search`, { query });
     },
     addManual: (siteKey, body) => admin('POST', `/${siteKey}/kb/manual`, body),
     ingestUrl: (siteKey, url) => admin('POST', `/${siteKey}/kb/url`, { url }),

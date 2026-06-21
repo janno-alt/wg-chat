@@ -19,8 +19,10 @@ const schema = z.object({
 
   EMBEDDING_DIMENSIONS: z.coerce.number().default(1024),
 
-  SIMILARITY_DIRECT_THRESHOLD: z.coerce.number().default(0.86),
-  SIMILARITY_RAG_THRESHOLD: z.coerce.number().default(0.72),
+  // Cosine-Ähnlichkeit (0..1). mistral-embed liefert eher niedrigere Werte –
+  // daher bewusst moderate Schwellen, sonst eskaliert der Bot zu früh.
+  SIMILARITY_DIRECT_THRESHOLD: z.coerce.number().default(0.8),
+  SIMILARITY_RAG_THRESHOLD: z.coerce.number().default(0.4),
   SIMILARITY_CACHE_THRESHOLD: z.coerce.number().default(0.95),
 
   // pgvector HNSW: Recall/Speed-Tradeoff der ANN-Suche (höher = genauer, etwas langsamer).

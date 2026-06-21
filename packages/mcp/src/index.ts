@@ -125,6 +125,20 @@ tool(
   ({ siteKey, documentId }) => adminFetch('DELETE', `/${siteKey}/kb/${documentId}`),
 );
 
+tool(
+  'list_chunks',
+  'Listet die extrahierten/embeddeten Chunks eines KB-Dokuments.',
+  { siteKey, documentId: z.string() },
+  ({ siteKey, documentId }) => adminFetch('GET', `/${siteKey}/kb/${documentId}/chunks`),
+);
+
+tool(
+  'search_knowledge',
+  'Testet die Wissensbasis: Frage embedden und beste Treffer mit Ähnlichkeits-Score liefern (Diagnose, warum der Bot ggf. eskaliert).',
+  { siteKey, query: z.string() },
+  ({ siteKey, query }) => adminFetch('POST', `/${siteKey}/kb/search`, { query }),
+);
+
 // ── Konversationen / Leads / Wissenslücken ──
 tool('list_conversations', 'Listet jüngste Konversationen eines Kunden.', { siteKey }, ({ siteKey }) =>
   adminFetch('GET', `/${siteKey}/conversations`),

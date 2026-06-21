@@ -16,6 +16,28 @@ export interface KbDoc {
   title: string | null;
   status: string;
   createdAt: string;
+  chunkCount: number;
+}
+
+export interface Chunk {
+  id: string;
+  content: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface SearchHit {
+  chunkId: string;
+  documentId: string;
+  content: string;
+  canonicalAnswer: string | null;
+  title: string | null;
+  sourceUrl: string | null;
+  similarity: number;
+}
+
+export interface SearchResult {
+  hits: SearchHit[];
+  thresholds: { direct: number; rag: number };
 }
 
 export interface UsageRow {

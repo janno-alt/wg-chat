@@ -7,6 +7,7 @@ import { getConfig } from '../config.js';
 import {
   createTenant,
   listTenants,
+  resolveThresholds,
   resolveTenantBySiteKey,
   updateTenant,
   updateTenantSettings,
@@ -15,6 +16,7 @@ import {
 import { getUsageSummary } from '../services/usage.js';
 import { listLeads } from '../services/lead.js';
 import { suggestGapAnswer } from '../services/gapsuggest.js';
+import { searchKnowledge } from '../services/kbsearch.js';
 import { getTranscript, listConversations } from '../services/conversation.js';
 import { getSessionUser } from './auth.js';
 import {
@@ -22,6 +24,7 @@ import {
   deleteDocument,
   ingestDocument,
   ingestUrl,
+  listChunks,
   listDocuments,
   publishDocument,
   reindexDocument,
@@ -194,6 +197,30 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         return { error: 'not_found', message: 'Dokument nicht gefunden.' };
       }
       return { deleted: true };
+    });
+  });
+
+  // ── Chunks eines Dokuments (Wissens-Einsicht) ──
+  app.get<{ Params: { siteKey: string; docId: string } }>('/:siteKey/kb/:docId/chunks', async (req, reply) => {
+    const t = await tenantOr404(req.params.siteKey, reply);
+    if (!t) return;
+    return inTenant(t, reply, async () => ({ chunks: await listChunks(req.params.docId) }));
+  });
+
+  // ── Wissen testen: Testfrage embedden + beste Treffer mit Score ──
+  app.post<{ Params: { siteKey: string } }>('/:siteKey/kb/search', async (req, reply) => {
+    const t = await tenantOr404(req.params.siteKey, reply);
+    if (!t) return;
+    const { query } = z.object({ query: z.string().min(1).max(2000) }).parse(req.body);
+    return inTenant(t, reply, async () => {
+      try {
+        const hits = await searchKnowledge(t.id, query, t.llmProviderCfg);
+        const th = resolveThresholds(t);
+        return { hits, thresholds: { direct: th.direct, rag: th.rag } };
+      } catch (err) {
+        reply.code(422);
+        return { error: 'search_failed', message: (err as Error).message };
+      }
     });
   });
 

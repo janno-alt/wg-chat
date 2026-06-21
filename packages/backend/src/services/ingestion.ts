@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { tdb } from '../db/client.js';
 import { kbChunks, kbDocuments } from '../db/schema.js';
 import { getConfig } from '../config.js';
@@ -192,10 +192,20 @@ export async function listDocuments(tenantId: string) {
       title: kbDocuments.title,
       status: kbDocuments.status,
       createdAt: kbDocuments.createdAt,
+      chunkCount: sql<number>`(select count(*)::int from kb_chunks c where c.document_id = ${kbDocuments.id})`,
     })
     .from(kbDocuments)
     .where(eq(kbDocuments.tenantId, tenantId))
     .orderBy(desc(kbDocuments.createdAt));
+}
+
+/** Die extrahierten/embeddeten Chunks eines Dokuments (für die „Wissen"-Ansicht). */
+export async function listChunks(documentId: string) {
+  return tdb()
+    .select({ id: kbChunks.id, content: kbChunks.content, metadata: kbChunks.metadata })
+    .from(kbChunks)
+    .where(eq(kbChunks.documentId, documentId))
+    .limit(500);
 }
 
 export async function deleteDocument(tenantId: string, documentId: string): Promise<boolean> {
