@@ -17,7 +17,7 @@ import { getUsageSummary } from '../services/usage.js';
 import { listLeads } from '../services/lead.js';
 import { suggestGapAnswer } from '../services/gapsuggest.js';
 import { searchKnowledge } from '../services/kbsearch.js';
-import { kbDiagnostics } from '../services/diagnostics.js';
+import { kbDiagnostics, purgeKb } from '../services/diagnostics.js';
 import { getTranscript, listConversations } from '../services/conversation.js';
 import { getSessionUser } from './auth.js';
 import {
@@ -213,6 +213,13 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const t = await tenantOr404(req.params.siteKey, reply);
     if (!t) return;
     return inTenant(t, reply, () => kbDiagnostics(t.schemaName));
+  });
+
+  // ── KB komplett leeren (Kunden-Schema + public-Altlast) für sauberen Neustart ──
+  app.post<{ Params: { siteKey: string } }>('/:siteKey/kb/purge', async (req, reply) => {
+    const t = await tenantOr404(req.params.siteKey, reply);
+    if (!t) return;
+    return { purged: await purgeKb(t.schemaName, t.id) };
   });
 
   // ── Wissen testen: Testfrage embedden + beste Treffer mit Score ──

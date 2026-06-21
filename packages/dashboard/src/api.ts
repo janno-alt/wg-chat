@@ -2,6 +2,7 @@ import type {
   Chunk,
   CrawlSummary,
   KbDiagnostics,
+  PurgeResult,
   Gap,
   KbDoc,
   Lead,
@@ -36,6 +37,7 @@ export interface Api {
   listKb(siteKey: string): Promise<KbDoc[]>;
   listChunks(siteKey: string, docId: string): Promise<Chunk[]>;
   kbDiagnostics(siteKey: string): Promise<KbDiagnostics>;
+  purgeKb(siteKey: string): Promise<{ purged: PurgeResult }>;
   searchKb(siteKey: string, query: string): Promise<SearchResult>;
   addManual(siteKey: string, body: Record<string, unknown>): Promise<unknown>;
   ingestUrl(siteKey: string, url: string): Promise<unknown>;
@@ -63,10 +65,12 @@ export function createApi(baseUrl = ''): Api {
   const root = baseUrl.replace(/\/$/, '');
 
   async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
+    // content-type NUR setzen, wenn es auch einen Body gibt – sonst lehnt Fastify
+    // leere Requests ab ("Body cannot be empty when content-type is application/json").
     const res = await fetch(`${root}${path}`, {
       method,
       credentials: 'include',
-      headers: { 'content-type': 'application/json' },
+      headers: body === undefined ? {} : { 'content-type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const text = await res.text();
@@ -106,6 +110,7 @@ export function createApi(baseUrl = ''): Api {
       return (await admin<{ chunks: Chunk[] }>('GET', `/${siteKey}/kb/${docId}/chunks`)).chunks;
     },
     kbDiagnostics: (siteKey) => admin<KbDiagnostics>('GET', `/${siteKey}/kb/diagnostics`),
+    purgeKb: (siteKey) => admin<{ purged: PurgeResult }>('POST', `/${siteKey}/kb/purge`),
     searchKb(siteKey, query) {
       return admin('POST', `/${siteKey}/kb/search`, { query });
     },

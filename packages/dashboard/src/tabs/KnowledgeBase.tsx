@@ -92,6 +92,24 @@ export function KnowledgeBase({ api, siteKey }: { api: Api; siteKey: string }) {
     }
   }
 
+  async function purgeAll() {
+    if (!confirm('Wirklich ALLE Dokumente und Embeddings dieses Kunden löschen? Danach einmal sauber neu crawlen.')) return;
+    setDiagBusy(true);
+    try {
+      const { purged } = await api.purgeKb(siteKey);
+      alert(
+        `Geleert: ${purged.schemaDocs} Dokument(e) + ${purged.schemaChunks} Chunk(s) im Kunden-Schema, ` +
+          `${purged.publicDocs} + ${purged.publicChunks} aus public (Altlast).`,
+      );
+      setDiag(null);
+      reload();
+    } catch (e) {
+      alert((e as Error)?.message ?? String(e));
+    } finally {
+      setDiagBusy(false);
+    }
+  }
+
   // Chunks aufklappen
   const [expanded, setExpanded] = useState<Record<string, Chunk[] | 'loading'>>({});
   async function toggleChunks(docId: string) {
@@ -193,11 +211,17 @@ export function KnowledgeBase({ api, siteKey }: { api: Api; siteKey: string }) {
 
       <Card
         title="Diagnose (Daten-Speicherort)"
-        actions={<Button variant="subtle" disabled={diagBusy} onClick={runDiagnostics}>{diagBusy ? 'Prüfe …' : 'Prüfen'}</Button>}
+        actions={
+          <div className="flex gap-1">
+            <Button variant="subtle" disabled={diagBusy} onClick={runDiagnostics}>{diagBusy ? 'Prüfe …' : 'Prüfen'}</Button>
+            <Button variant="danger" disabled={diagBusy} onClick={purgeAll}>KB komplett leeren</Button>
+          </div>
+        }
       >
         <p className="text-xs text-slate-500">
           Zeigt, in welchem Schema der Bot liest/schreibt und wo Dokumente &amp; Chunks wirklich liegen –
-          deckt auf, warum die Crawl-Meldung und die Tabelle sich widersprechen.
+          deckt auf, warum die Crawl-Meldung und die Tabelle sich widersprechen. „KB komplett leeren"
+          setzt diesen Kunden zurück (für einen sauberen Neu-Crawl).
         </p>
         {diag && (
           <div className="mt-3 space-y-2 text-sm">
@@ -205,8 +229,11 @@ export function KnowledgeBase({ api, siteKey }: { api: Api; siteKey: string }) {
               <Stat label="Schema" value={diag.schemaName ?? '—'} />
               <Stat label="search_path" value={diag.searchPath} />
               <Stat label="App sieht Docs / Chunks" value={`${diag.appDocs} / ${diag.appChunks}`} />
-              <Stat label={`Schema ${diag.schemaName ?? ''} Docs / Chunks`} value={`${diag.tenantSchemaDocs ?? '—'} / ${diag.tenantSchemaChunks ?? '—'}`} />
-              <Stat label="public Docs / Chunks" value={`${diag.publicDocs ?? '—'} / ${diag.publicChunks ?? '—'}`} />
+              <Stat label={`Schema Docs / Chunks`} value={`${diag.tenantSchemaDocs ?? '—'} / ${diag.tenantSchemaChunks ?? '—'}`} />
+              <Stat label="public Docs / Chunks (Altlast)" value={`${diag.publicDocs ?? '—'} / ${diag.publicChunks ?? '—'}`} />
+              <Stat label="Docs MIT Chunks" value={`${diag.docsWithChunks ?? '—'}`} />
+              <Stat label="Verwaiste Chunks" value={`${diag.orphanChunks ?? '—'}`} />
+              <Stat label="Doppelte URLs" value={`${diag.duplicateUrls ?? '—'}`} />
             </div>
             {diag.notes.map((n, i) => (
               <div key={i} className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">{n}</div>

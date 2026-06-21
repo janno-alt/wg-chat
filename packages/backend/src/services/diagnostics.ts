@@ -20,6 +20,12 @@ export interface KbDiagnostics {
   /** Alt-Daten aus der Zeit vor Schema-pro-Kunde (Phase 8b) liegen evtl. noch hier. */
   publicDocs: number | null;
   publicChunks: number | null;
+  /** Chunks im Kunden-Schema, die zu KEINEM Dokument gehören (Altlast/Buggy-Phase). */
+  orphanChunks: number | null;
+  /** Dokumente, die tatsächlich Chunks haben. */
+  docsWithChunks: number | null;
+  /** Anzahl mehrfach (gleiche URL) vorhandener Dokumente. */
+  duplicateUrls: number | null;
   notes: string[];
 }
 
@@ -30,6 +36,47 @@ async function qualifiedCount(qualified: string): Promise<number | null> {
   // qualified entsteht ausschließlich aus validierten Schema-Namen → kein Injection-Risiko.
   const c = await pool.query<{ n: number }>(`select count(*)::int as n from ${qualified}`);
   return c.rows[0]?.n ?? 0;
+}
+
+/** Ein einzelner ::int-Skalar aus einer (schema-validierten) Query. */
+async function scalar(query: string): Promise<number | null> {
+  const c = await getPool().query<{ n: number }>(query);
+  return c.rows[0]?.n ?? 0;
+}
+
+export interface PurgeResult {
+  schemaChunks: number;
+  schemaDocs: number;
+  publicChunks: number;
+  publicDocs: number;
+}
+
+/**
+ * Löscht ALLE Wissensbasis-Daten eines Kunden – im Kunden-Schema (komplett) und die
+ * Alt-Daten im public-Schema (auf diesen Tenant beschränkt). Für einen sauberen
+ * Neustart nach inkonsistenten Crawls. Chunks zuerst (deckt auch verwaiste ab).
+ */
+export async function purgeKb(schemaName: string | null, tenantId: string): Promise<PurgeResult> {
+  const pool = getPool();
+  const res: PurgeResult = { schemaChunks: 0, schemaDocs: 0, publicChunks: 0, publicDocs: 0 };
+
+  if (schemaName && isValidSchema(schemaName)) {
+    const s = `"${schemaName}"`;
+    if (await pool.query('select to_regclass($1) as r', [`${schemaName}.kb_chunks`]).then((r) => r.rows[0]?.r)) {
+      res.schemaChunks = (await pool.query(`delete from ${s}.kb_chunks`)).rowCount ?? 0;
+    }
+    if (await pool.query('select to_regclass($1) as r', [`${schemaName}.kb_documents`]).then((r) => r.rows[0]?.r)) {
+      res.schemaDocs = (await pool.query(`delete from ${s}.kb_documents`)).rowCount ?? 0;
+    }
+  }
+
+  if (await pool.query("select to_regclass('public.kb_chunks') as r").then((r) => r.rows[0]?.r)) {
+    res.publicChunks = (await pool.query('delete from public.kb_chunks where tenant_id = $1', [tenantId])).rowCount ?? 0;
+  }
+  if (await pool.query("select to_regclass('public.kb_documents') as r").then((r) => r.rows[0]?.r)) {
+    res.publicDocs = (await pool.query('delete from public.kb_documents where tenant_id = $1', [tenantId])).rowCount ?? 0;
+  }
+  return res;
 }
 
 export async function kbDiagnostics(schemaName: string | null): Promise<KbDiagnostics> {
@@ -50,11 +97,25 @@ export async function kbDiagnostics(schemaName: string | null): Promise<KbDiagno
 
   let tenantSchemaDocs: number | null = null;
   let tenantSchemaChunks: number | null = null;
+  let orphanChunks: number | null = null;
+  let docsWithChunks: number | null = null;
+  let duplicateUrls: number | null = null;
   if (schemaName && isValidSchema(schemaName)) {
-    tenantSchemaDocs = await qualifiedCount(`"${schemaName}".kb_documents`);
-    tenantSchemaChunks = await qualifiedCount(`"${schemaName}".kb_chunks`);
+    const s = `"${schemaName}"`;
+    tenantSchemaDocs = await qualifiedCount(`${s}.kb_documents`);
+    tenantSchemaChunks = await qualifiedCount(`${s}.kb_chunks`);
     if (tenantSchemaChunks === null) {
       notes.push(`Tabelle "${schemaName}".kb_chunks existiert NICHT – Schema unvollständig provisioniert.`);
+    } else {
+      orphanChunks = await scalar(
+        `select count(*)::int as n from ${s}.kb_chunks c where not exists (select 1 from ${s}.kb_documents d where d.id = c.document_id)`,
+      );
+      docsWithChunks = await scalar(
+        `select count(*)::int as n from ${s}.kb_documents d where exists (select 1 from ${s}.kb_chunks c where c.document_id = d.id)`,
+      );
+      duplicateUrls = await scalar(
+        `select count(*)::int as n from (select source_url from ${s}.kb_documents where source_url is not null group by source_url having count(*) > 1) x`,
+      );
     }
   } else {
     notes.push('Tenant hat keinen gültigen schema_name – Daten landen evtl. im public-Schema.');
@@ -74,8 +135,21 @@ export async function kbDiagnostics(schemaName: string | null): Promise<KbDiagno
       `Chunks liegen im public-Schema (${publicChunks}), nicht im Kunden-Schema. → Beim Schreiben war search_path = public.`,
     );
   }
-  if ((tenantSchemaChunks ?? 0) > 0 && appChunks === tenantSchemaChunks) {
-    notes.push('App-Sicht und Schema stimmen überein – die Chunks sind sichtbar (kein Schema-Problem).');
+  if ((orphanChunks ?? 0) > 0) {
+    notes.push(
+      `${orphanChunks} Chunk(s) gehören zu KEINEM Dokument (Altlast aus der Buggy-Phase). Deshalb zeigt die Tabelle „keine Embeddings". → „KB komplett leeren" und EINMAL sauber neu crawlen.`,
+    );
+  }
+  if ((docsWithChunks ?? 0) === 0 && (tenantSchemaDocs ?? 0) > 0 && (tenantSchemaChunks ?? 0) > 0) {
+    notes.push(
+      'Kein einziges Dokument ist mit seinen Chunks verknüpft – Dokumente und Chunks stammen aus verschiedenen (Buggy-)Läufen. → KB leeren und neu crawlen.',
+    );
+  }
+  if ((duplicateUrls ?? 0) > 0) {
+    notes.push(`${duplicateUrls} URL(s) sind mehrfach vorhanden (mehrfaches Crawlen) – Duplikate aufräumen.`);
+  }
+  if ((tenantSchemaChunks ?? 0) > 0 && appChunks === tenantSchemaChunks && (orphanChunks ?? 0) === 0 && (docsWithChunks ?? 0) > 0) {
+    notes.push('App-Sicht und Schema stimmen überein – die Chunks sind korrekt verknüpft (kein Problem).');
   }
 
   return {
@@ -87,6 +161,9 @@ export async function kbDiagnostics(schemaName: string | null): Promise<KbDiagno
     tenantSchemaChunks,
     publicDocs,
     publicChunks,
+    orphanChunks,
+    docsWithChunks,
+    duplicateUrls,
     notes,
   };
 }

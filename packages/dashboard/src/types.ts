@@ -42,7 +42,17 @@ export interface KbDiagnostics {
   tenantSchemaChunks: number | null;
   publicDocs: number | null;
   publicChunks: number | null;
+  orphanChunks: number | null;
+  docsWithChunks: number | null;
+  duplicateUrls: number | null;
   notes: string[];
+}
+
+export interface PurgeResult {
+  schemaChunks: number;
+  schemaDocs: number;
+  publicChunks: number;
+  publicDocs: number;
 }
 
 export interface SearchHit {
