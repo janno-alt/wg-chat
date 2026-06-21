@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kine-chat – Demo-Kundenseite</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; color: #1f2937; }
+      header { background: #0f766e; color: #fff; padding: 3rem 1.5rem; }
+      main { max-width: 760px; margin: 0 auto; padding: 2rem 1.5rem 120vh; line-height: 1.7; }
+      h1 { margin: 0; } h2 { color: #0f766e; margin-top: 2.5rem; }
+      .hint { background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 10px; padding: 1rem 1.25rem; }
+      code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <header><h1>Demo GmbH</h1><p>Beispielseite zum Testen des kine-chat-Widgets</p></header>
+    <main>
+      <div class="hint">
+        Diese Seite simuliert eine Kundenseite mit eingebundenem Widget-Snippet.
+        Backend muss laufen und der Demo-Tenant geseedet sein. Zum Testen des
+        seitenweiten Scroll-Triggers einfach weit nach unten scrollen.
+      </div>
+      <h2>Leistungen</h2>
+      <p>Wir bauen Websites, kümmern uns um SEO und bieten Wartung. Frag den Chatbot
+         unten rechts z. B. <em>„Was kostet eine Website?“</em> (FAQ-Treffer, 0 LLM)
+         oder etwas Abseitiges, um die Eskalation zu sehen.</p>
+      <h2>Viel Inhalt zum Scrollen</h2>
+      <p>Scrolle nach unten, um den seitenweiten Scroll-Outreach-Trigger (60 %) auszulösen.</p>
+
+      <!-- ► Genau dieses eine Snippet kommt später auf die echten WordPress-Seiten.
+           w.js und API kommen vom selben Origin (hier das lokale Backend); data-api
+           kann entfallen (wird aus der Script-Herkunft abgeleitet). -->
+      <script async src="http://localhost:8787/w.js" data-tenant="demo"></script>
+    </main>
+  </body>
+</html>

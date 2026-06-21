@@ -1,0 +1,23 @@
+<!--
+  WordPress-Einbindung von kine-chat
+  ==================================
+  Es ist KEIN Plugin nötig. Eine der folgenden Varianten genügt:
+
+  A) Elementor:  Element „HTML“ in den Footer/Header-Template ziehen und das
+     Snippet unten einfügen. (Da ihr die Seiten via Elementor-MCP verwaltet,
+     lässt sich das automatisiert ausrollen.)
+
+  B) Theme/Plugin „Insert Headers and Footers“ (WPCode o.ä.):
+     Snippet in den „Footer“-Bereich einfügen.
+
+  C) Theme-Datei footer.php vor </body> einfügen.
+
+  Pro Kunde nur den data-tenant-Wert (site_key) austauschen.
+  data-api zeigt auf den zentralen Container-Dienst (Mittwald mStudio).
+-->
+<script
+  async
+  src="https://chat.kine.media/w.js"
+  data-tenant="DEIN_SITE_KEY"
+  data-api="https://chat.kine.media"
+></script>

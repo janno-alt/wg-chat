@@ -1,0 +1,12 @@
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.local
+.DS_Store
+coverage/
+.tsbuildinfo
+*.tsbuildinfo
+postgres-data/
+.claude/settings.local.json

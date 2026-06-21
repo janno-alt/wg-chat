@@ -1,0 +1,57 @@
+# Mittwald Container-Stack für kine-chat.
+# Wird von der GitHub Action `mittwald/deploy-container-action@v1` deployt
+# (siehe .github/workflows/deploy.yml). Platzhalter `{{ .Env.X }}` werden zur
+# Deploy-Zeit aus den Workflow-Env-Variablen / GitHub-Secrets aufgelöst –
+# es stehen KEINE Secrets in diesem Repo.
+#
+# Wichtig: Diese Datei ist die Quelle der Wahrheit. Manuelle Änderungen im
+# mStudio-UI am Stack werden beim nächsten Deploy überschrieben.
+
+services:
+  # PostgreSQL + pgvector als eigener Container (Mittwald bietet kein managed PG).
+  # Das pgvector-Image enthält die Extension -> `CREATE EXTENSION vector` klappt.
+  postgres:
+    image: "pgvector/pgvector:pg16"
+    description: "kine-chat PostgreSQL + pgvector"
+    environment:
+      POSTGRES_USER: kine
+      POSTGRES_PASSWORD: "{{ .Env.POSTGRES_PASSWORD }}"
+      POSTGRES_DB: kinechat
+    volumes:
+      # Persistenz; wird mit den Mittwald-Projekt-Backups gesichert.
+      - "pgdata:/var/lib/postgresql/data"
+
+  # Backend (inkl. mitgebautem Widget unter /w.js). Erreicht die DB intern
+  # über den Service-Namen "postgres" (Mittwald-internes Netzwerk).
+  backend:
+    image: "{{ .Env.IMAGE_TAG }}"
+    description: "kine-chat Backend + Widget"
+    ports:
+      - "8787/tcp"
+    environment:
+      NODE_ENV: production
+      PORT: "8787"
+      PUBLIC_BASE_URL: "{{ .Env.PUBLIC_BASE_URL }}"
+      DATABASE_URL: "postgres://kine:{{ .Env.POSTGRES_PASSWORD }}@postgres:5432/kinechat"
+      LLM_PROVIDER: mistral
+      MISTRAL_API_KEY: "{{ .Env.MISTRAL_API_KEY }}"
+      MISTRAL_CHAT_MODEL: mistral-small-latest
+      MISTRAL_EMBED_MODEL: mistral-embed
+      EMBEDDING_DIMENSIONS: "1024"
+      # Schlüssel für die gesicherte Admin-/Ingestion-API (KB pflegen, crawlen).
+      ADMIN_API_KEY: "{{ .Env.ADMIN_API_KEY }}"
+      # SMTP für Lead-Benachrichtigungen (optional; leeres SMTP_HOST = E-Mail aus).
+      # Nur die Geheimnisse werden getemplatet; PORT/SECURE/FROM hier setzen.
+      SMTP_HOST: "{{ .Env.SMTP_HOST }}"
+      SMTP_USER: "{{ .Env.SMTP_USER }}"
+      SMTP_PASS: "{{ .Env.SMTP_PASS }}"
+      SMTP_PORT: "587"
+      SMTP_SECURE: "false"
+      SMTP_FROM: "kine-chat <no-reply@kine.media>"
+      # In Produktion Origin-Prüfung aktiv lassen: jeder Tenant muss seine
+      # erlaubten Domains gepflegt haben. Für die allererste Inbetriebnahme
+      # ggf. temporär auf "true".
+      ALLOW_ALL_ORIGINS: "false"
+
+volumes:
+  pgdata: {}

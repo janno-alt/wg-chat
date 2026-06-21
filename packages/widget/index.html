@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kine-chat – Widget Dev</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; padding: 3rem; line-height: 1.6; color: #222; }
+      .box { max-width: 640px; margin: 0 auto; }
+      h1 { color: #0f766e; }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <h1>kine-chat – Widget Dev-Seite</h1>
+      <p>Diese Seite simuliert eine Kundenseite. Das Widget unten rechts lädt seine
+         Konfiguration vom Backend (<code>data-tenant="demo"</code>).</p>
+      <p>Backend muss laufen (<code>http://localhost:8787</code>) und der Demo-Tenant
+         geseedet sein.</p>
+    </div>
+
+    <!-- Vom Widget gelesen: Tenant-Key + Backend-URL -->
+    <script data-tenant="demo" data-api="http://localhost:8787"></script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
