@@ -33,6 +33,18 @@ export interface Chunk {
   metadata: Record<string, unknown>;
 }
 
+export interface KbDiagnostics {
+  schemaName: string | null;
+  searchPath: string;
+  appDocs: number;
+  appChunks: number;
+  tenantSchemaDocs: number | null;
+  tenantSchemaChunks: number | null;
+  publicDocs: number | null;
+  publicChunks: number | null;
+  notes: string[];
+}
+
 export interface SearchHit {
   chunkId: string;
   documentId: string;

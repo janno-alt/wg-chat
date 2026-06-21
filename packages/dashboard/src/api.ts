@@ -1,6 +1,7 @@
 import type {
   Chunk,
   CrawlSummary,
+  KbDiagnostics,
   Gap,
   KbDoc,
   Lead,
@@ -34,6 +35,7 @@ export interface Api {
 
   listKb(siteKey: string): Promise<KbDoc[]>;
   listChunks(siteKey: string, docId: string): Promise<Chunk[]>;
+  kbDiagnostics(siteKey: string): Promise<KbDiagnostics>;
   searchKb(siteKey: string, query: string): Promise<SearchResult>;
   addManual(siteKey: string, body: Record<string, unknown>): Promise<unknown>;
   ingestUrl(siteKey: string, url: string): Promise<unknown>;
@@ -103,6 +105,7 @@ export function createApi(baseUrl = ''): Api {
     async listChunks(siteKey, docId) {
       return (await admin<{ chunks: Chunk[] }>('GET', `/${siteKey}/kb/${docId}/chunks`)).chunks;
     },
+    kbDiagnostics: (siteKey) => admin<KbDiagnostics>('GET', `/${siteKey}/kb/diagnostics`),
     searchKb(siteKey, query) {
       return admin('POST', `/${siteKey}/kb/search`, { query });
     },

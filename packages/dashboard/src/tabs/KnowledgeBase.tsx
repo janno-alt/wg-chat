@@ -1,7 +1,16 @@
 import { Fragment, useState } from 'react';
 import type { Api } from '../api.js';
-import type { Chunk, SearchResult } from '../types.js';
+import type { Chunk, KbDiagnostics, SearchResult } from '../types.js';
 import { Badge, Button, Card, Field, Input, Spinner, ErrorNote, useAsync, fmtDate } from '../components/ui.js';
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
+      <div className="text-[10px] uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="truncate font-mono text-xs text-slate-700" title={value}>{value}</div>
+    </div>
+  );
+}
 
 export function KnowledgeBase({ api, siteKey }: { api: Api; siteKey: string }) {
   const { data, loading, error, reload } = useAsync(() => api.listKb(siteKey), [siteKey]);
@@ -66,6 +75,20 @@ export function KnowledgeBase({ api, siteKey }: { api: Api; siteKey: string }) {
       setResult(null);
     } finally {
       setSearching(false);
+    }
+  }
+
+  // Diagnose: wo liegen die Daten wirklich?
+  const [diag, setDiag] = useState<KbDiagnostics | null>(null);
+  const [diagBusy, setDiagBusy] = useState(false);
+  async function runDiagnostics() {
+    setDiagBusy(true);
+    try {
+      setDiag(await api.kbDiagnostics(siteKey));
+    } catch (e) {
+      alert((e as Error)?.message ?? String(e));
+    } finally {
+      setDiagBusy(false);
     }
   }
 
@@ -164,6 +187,30 @@ export function KnowledgeBase({ api, siteKey }: { api: Api; siteKey: string }) {
                 </div>
               );
             })}
+          </div>
+        )}
+      </Card>
+
+      <Card
+        title="Diagnose (Daten-Speicherort)"
+        actions={<Button variant="subtle" disabled={diagBusy} onClick={runDiagnostics}>{diagBusy ? 'Prüfe …' : 'Prüfen'}</Button>}
+      >
+        <p className="text-xs text-slate-500">
+          Zeigt, in welchem Schema der Bot liest/schreibt und wo Dokumente &amp; Chunks wirklich liegen –
+          deckt auf, warum die Crawl-Meldung und die Tabelle sich widersprechen.
+        </p>
+        {diag && (
+          <div className="mt-3 space-y-2 text-sm">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <Stat label="Schema" value={diag.schemaName ?? '—'} />
+              <Stat label="search_path" value={diag.searchPath} />
+              <Stat label="App sieht Docs / Chunks" value={`${diag.appDocs} / ${diag.appChunks}`} />
+              <Stat label={`Schema ${diag.schemaName ?? ''} Docs / Chunks`} value={`${diag.tenantSchemaDocs ?? '—'} / ${diag.tenantSchemaChunks ?? '—'}`} />
+              <Stat label="public Docs / Chunks" value={`${diag.publicDocs ?? '—'} / ${diag.publicChunks ?? '—'}`} />
+            </div>
+            {diag.notes.map((n, i) => (
+              <div key={i} className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">{n}</div>
+            ))}
           </div>
         )}
       </Card>
