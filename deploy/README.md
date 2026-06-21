@@ -30,6 +30,40 @@ durch die GitHub Action. Deshalb in dieser Reihenfolge:
 5. **Erneut deployen:** Tag pushen / Workflow erneut starten → jetzt läuft auch der
    Deploy-Schritt und der Stack wird aus `deploy/stack.yaml` aktualisiert.
 
+> Hinweis: mStudio verlangt beim Container-Anlegen **immer ein Image**. Deshalb
+> niemals „leeren Stack" anlegen, sondern erst Image bauen (Schritt 1), dann den
+> Container **mit** diesem Image anlegen.
+
+---
+
+## Variante A: komplett über die mStudio-UI (ohne CI, ohne Stack-ID, ohne Terminal)
+
+Am direktesten, wenn man kein Auto-Deploy braucht. Nach Schritt 1+2 oben
+(Image gebaut + Package public) zwei Container anlegen:
+
+**Container „postgres"** (Name = interner Hostname):
+- Image `pgvector/pgvector:pg16`
+- Env: `POSTGRES_USER=wgchat`, `POSTGRES_PASSWORD=<wählen>`, `POSTGRES_DB=wgchat`
+- Volume: neu, Mount `/var/lib/postgresql/data`
+
+**Container „backend"**:
+- Image `ghcr.io/janno-alt/wg-chat-backend:latest`, Port `8787`
+- Env: `NODE_ENV=production`, `PORT=8787`,
+  `DATABASE_URL=postgres://wgchat:<pw>@postgres:5432/wgchat`,
+  `LLM_PROVIDER=mistral`, `MISTRAL_API_KEY=<key>`,
+  `MISTRAL_CHAT_MODEL=mistral-small-latest`, `MISTRAL_EMBED_MODEL=mistral-embed`,
+  `EMBEDDING_DIMENSIONS=1024`, `ADMIN_API_KEY=<key>`,
+  `PUBLIC_BASE_URL=https://chat.deine-domain.de`, `ALLOW_ALL_ORIGINS=false`
+
+Migration läuft beim Start automatisch. Danach Domain → `backend:8787` (Schritt 5
+unten) und seeden. **Keine Stack-ID, keine GitHub-Secrets nötig.**
+
+## Variante B: automatisch per GitHub Action
+
+Hier legst du **keinen Container von Hand** an – die Action schreibt beide Services
+aus `deploy/stack.yaml` in den bereits vorhandenen **`default`-Stack** des Projekts.
+Du brauchst nur dessen ID (`mw stack list` oder UI) + die Secrets/Variables unten.
+
 ## 0. Voraussetzungen
 
 - mStudio-Tarif **mit Container Hosting** (nicht in allen Plänen – ggf. freischalten).
