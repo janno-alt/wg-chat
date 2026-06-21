@@ -15,11 +15,12 @@ chat.kine.media ──(VirtualHost/TLS)──▶ Backend :8787 ──intern─�
 Ein Container-Stack braucht ein **vorhandenes Image**. Das Image entsteht aber erst
 durch die GitHub Action. Deshalb in dieser Reihenfolge:
 
-1. **Image bauen lassen (ohne Mittwald):** Tag pushen *oder* in GitHub →
-   Actions → „Build & Deploy" → **Run workflow**. Solange `MITTWALD_STACK_ID`
-   noch **nicht** gesetzt ist, wird der Deploy-Schritt automatisch übersprungen –
-   es wird **nur** `ghcr.io/janno-alt/wg-chat-backend:…` gebaut und gepusht.
-   (Dein Rechner braucht kein Docker – das macht die Action.)
+1. **Image bauen lassen (ohne Mittwald, ohne Terminal):** in GitHub →
+   **Actions** → Workflow **„Image bauen (GHCR)"** → **Run workflow** (optional
+   einen Tag wie `v0.1.0` eintragen). Baut & pusht `ghcr.io/janno-alt/wg-chat-backend:…`.
+   (Dein Rechner braucht kein Docker – das macht die Action.) Alternativ baut auch
+   der „Build & Deploy"-Workflow per Tag; sein Deploy-Schritt wird übersprungen,
+   solange `MITTWALD_STACK_ID` nicht gesetzt ist.
 2. **GHCR-Package erreichbar machen:** auf *public* stellen **oder** Registry-Zugang
    in mStudio hinterlegen (siehe Schritt 3 unten).
 3. **Stack anlegen** – jetzt existiert das Image: in mStudio einen Container mit

@@ -1,0 +1,66 @@
+name: Image bauen (GHCR)
+
+# Baut nur das Backend-Image (inkl. Widget) und pusht es nach GHCR.
+# Per Hand auslösbar: GitHub → Actions → "Image bauen (GHCR)" → "Run workflow".
+# Braucht KEINE Mittwald-Konfiguration und kein lokales Docker.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image-Tag (z.B. v0.1.0). Leer = nur :latest'
+        required: false
+        default: ''
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # Push nach GHCR
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: vars
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: echo "image=ghcr.io/${OWNER,,}/wg-chat-backend" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tags bestimmen
+        id: tags
+        env:
+          IMAGE: ${{ steps.vars.outputs.image }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          if [ -n "$INPUT_TAG" ]; then
+            echo "tags=$IMAGE:$INPUT_TAG,$IMAGE:latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "tags=$IMAGE:latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build & Push (Backend inkl. Widget)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: packages/backend/Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+
+      - name: Zusammenfassung
+        run: |
+          {
+            echo "### Image gebaut & gepusht"
+            echo ""
+            echo '```'
+            echo "${{ steps.tags.outputs.tags }}"
+            echo '```'
+            echo "Danach in mStudio einen Container mit diesem Image anlegen."
+          } >> "$GITHUB_STEP_SUMMARY"
