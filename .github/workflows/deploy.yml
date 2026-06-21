@@ -52,7 +52,11 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
+      # Deploy nur, wenn Mittwald konfiguriert ist. Beim ersten Lauf (ohne
+      # MITTWALD_STACK_ID) wird NUR das Image gebaut/gepusht – damit lässt sich
+      # das Henne-Ei-Problem lösen: erst Image erzeugen, dann den Stack anlegen.
       - name: Deploy Stack nach Mittwald
+        if: ${{ vars.MITTWALD_STACK_ID != '' }}
         uses: mittwald/deploy-container-action@v1
         env:
           # Diese Werte werden in deploy/stack.yaml als {{ .Env.X }} aufgelöst.

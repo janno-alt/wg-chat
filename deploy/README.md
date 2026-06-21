@@ -10,17 +10,36 @@ GitHub Tag v* ──▶ Actions: Image bauen (Backend inkl. Widget) ──▶ GH
 chat.kine.media ──(VirtualHost/TLS)──▶ Backend :8787 ──intern──▶ postgres :5432
 ```
 
+## ⚠️ Reihenfolge (Henne-Ei): erst Image, dann Stack
+
+Ein Container-Stack braucht ein **vorhandenes Image**. Das Image entsteht aber erst
+durch die GitHub Action. Deshalb in dieser Reihenfolge:
+
+1. **Image bauen lassen (ohne Mittwald):** Tag pushen *oder* in GitHub →
+   Actions → „Build & Deploy" → **Run workflow**. Solange `MITTWALD_STACK_ID`
+   noch **nicht** gesetzt ist, wird der Deploy-Schritt automatisch übersprungen –
+   es wird **nur** `ghcr.io/janno-alt/wg-chat-backend:…` gebaut und gepusht.
+   (Dein Rechner braucht kein Docker – das macht die Action.)
+2. **GHCR-Package erreichbar machen:** auf *public* stellen **oder** Registry-Zugang
+   in mStudio hinterlegen (siehe Schritt 3 unten).
+3. **Stack anlegen** – jetzt existiert das Image: in mStudio einen Container mit
+   `ghcr.io/janno-alt/wg-chat-backend:latest` (+ pgvector-Container) anlegen, oder
+   `mw stack deploy`. **Stack-ID notieren.**
+4. **`MITTWALD_STACK_ID` + Secrets setzen** (siehe unten).
+5. **Erneut deployen:** Tag pushen / Workflow erneut starten → jetzt läuft auch der
+   Deploy-Schritt und der Stack wird aus `deploy/stack.yaml` aktualisiert.
+
 ## 0. Voraussetzungen
 
 - mStudio-Tarif **mit Container Hosting** (nicht in allen Plänen – ggf. freischalten).
 - `mw` CLI installiert & eingeloggt (`mw login`).
 - Repo liegt auf GitHub.
 
-## 1. Stack in mStudio anlegen (einmalig)
+## 1. Stack in mStudio anlegen (nach dem ersten Image-Build, siehe Reihenfolge oben)
 
-Container-Stack im Projekt anlegen (GUI: *Containers → Create*, oder leer per CLI)
-und dessen **Stack-ID** notieren – die Action befüllt den Stack danach aus
-`deploy/stack.yaml`.
+Container-Stack im Projekt anlegen (GUI: *Containers → Create* mit dem bereits
+gepushten Image, oder `mw stack deploy`) und dessen **Stack-ID** notieren – die
+Action aktualisiert den Stack danach aus `deploy/stack.yaml`.
 
 ```bash
 mw stack list           # Stack-ID herausfinden
