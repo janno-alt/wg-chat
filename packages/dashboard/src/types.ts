@@ -15,8 +15,16 @@ export interface KbDoc {
   sourceUrl: string | null;
   title: string | null;
   status: string;
+  ingestError: string | null;
   createdAt: string;
   chunkCount: number;
+}
+
+export interface CrawlSummary {
+  pagesFound: number;
+  embedded: number;
+  failed: number;
+  errors: string[];
 }
 
 export interface Chunk {

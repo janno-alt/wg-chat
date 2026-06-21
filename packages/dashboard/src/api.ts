@@ -1,5 +1,6 @@
 import type {
   Chunk,
+  CrawlSummary,
   Gap,
   KbDoc,
   Lead,
@@ -36,7 +37,7 @@ export interface Api {
   searchKb(siteKey: string, query: string): Promise<SearchResult>;
   addManual(siteKey: string, body: Record<string, unknown>): Promise<unknown>;
   ingestUrl(siteKey: string, url: string): Promise<unknown>;
-  crawl(siteKey: string, startUrl: string, maxPages: number): Promise<unknown>;
+  crawl(siteKey: string, startUrl: string, maxPages: number): Promise<CrawlSummary>;
   reindex(siteKey: string, docId: string): Promise<unknown>;
   publish(siteKey: string, docId: string): Promise<unknown>;
   faqgen(siteKey: string, docId: string, count: number): Promise<unknown>;
@@ -107,7 +108,7 @@ export function createApi(baseUrl = ''): Api {
     },
     addManual: (siteKey, body) => admin('POST', `/${siteKey}/kb/manual`, body),
     ingestUrl: (siteKey, url) => admin('POST', `/${siteKey}/kb/url`, { url }),
-    crawl: (siteKey, startUrl, maxPages) => admin('POST', `/${siteKey}/kb/crawl`, { startUrl, maxPages }),
+    crawl: (siteKey, startUrl, maxPages) => admin<CrawlSummary>('POST', `/${siteKey}/kb/crawl`, { startUrl, maxPages }),
     reindex: (siteKey, docId) => admin('POST', `/${siteKey}/kb/${docId}/reindex`),
     publish: (siteKey, docId) => admin('POST', `/${siteKey}/kb/${docId}/publish`),
     faqgen: (siteKey, docId, count) => admin('POST', `/${siteKey}/kb/${docId}/faqgen`, { count }),

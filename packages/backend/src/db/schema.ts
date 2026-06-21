@@ -86,6 +86,8 @@ export const kbDocuments = pgTable(
     canonicalAnswer: text('canonical_answer'),
     // draft | published | archived
     status: varchar('status', { length: 16 }).notNull().default('published'),
+    // Grund, falls keine Embeddings erzeugt wurden (null = ok)
+    ingestError: text('ingest_error'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('kb_documents_tenant_idx').on(t.tenantId)],

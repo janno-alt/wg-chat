@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS ${s}.kb_documents (
   raw_content text NOT NULL DEFAULT '',
   canonical_answer text,
   status varchar(16) NOT NULL DEFAULT 'published',
+  ingest_error text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -108,4 +109,12 @@ CREATE TABLE IF NOT EXISTS ${s}.leads (
 export async function provisionSchema(schema: string): Promise<void> {
   if (!isValidSchema(schema)) throw new Error(`Ungültiger Schema-Name: ${schema}`);
   await getPool().query(schemaDDL(schema));
+}
+
+/** Idempotente Spalten-Upgrades für bereits existierende Tenant-Schemas. */
+export async function ensureSchemaUpgrades(schema: string): Promise<void> {
+  if (!isValidSchema(schema)) throw new Error(`Ungültiger Schema-Name: ${schema}`);
+  await getPool().query(
+    `ALTER TABLE "${schema}".kb_documents ADD COLUMN IF NOT EXISTS ingest_error text;`,
+  );
 }

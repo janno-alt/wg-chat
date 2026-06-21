@@ -1,6 +1,6 @@
 import '../env.js';
 import { getPool } from './client.js';
-import { provisionSchema, schemaNameFor } from './provision.js';
+import { ensureSchemaUpgrades, provisionSchema, schemaNameFor } from './provision.js';
 
 /**
  * Globale Migration: Control-Plane + Agentur-Config in `public`. Die sensiblen
@@ -76,16 +76,19 @@ async function main() {
   console.log('▶ Migration (Control-Plane) läuft …');
   await pool.query(DDL);
 
-  // Backfill: bestehende Kunden ohne Schema bekommen eins (Daten werden NICHT
-  // automatisch migriert – Alt-Tenants ggf. neu anlegen/seeden).
-  const { rows } = await pool.query<{ id: string }>(
-    `SELECT id FROM tenants WHERE schema_name IS NULL`,
+  // Backfill: Schema je Kunde anlegen (falls fehlt) + Spalten-Upgrades nachziehen.
+  // Alt-Daten in public werden NICHT automatisch migriert – Alt-Tenants neu seeden.
+  const { rows } = await pool.query<{ id: string; schema_name: string | null }>(
+    `SELECT id, schema_name FROM tenants`,
   );
   for (const row of rows) {
-    const schema = schemaNameFor(row.id);
+    const schema = row.schema_name ?? schemaNameFor(row.id);
     await provisionSchema(schema);
-    await pool.query(`UPDATE tenants SET schema_name = $1 WHERE id = $2`, [schema, row.id]);
-    console.log(`  ↳ Schema ${schema} für Tenant ${row.id} angelegt`);
+    await ensureSchemaUpgrades(schema);
+    if (!row.schema_name) {
+      await pool.query(`UPDATE tenants SET schema_name = $1 WHERE id = $2`, [schema, row.id]);
+      console.log(`  ↳ Schema ${schema} für Tenant ${row.id} angelegt`);
+    }
   }
 
   console.log('✓ Migration abgeschlossen.');

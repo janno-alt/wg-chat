@@ -11,6 +11,7 @@ export interface IngestResult {
   documentId: string;
   chunks: number;
   embedded: boolean;
+  error?: string;
 }
 
 function batch<T>(arr: T[], size: number): T[][] {
@@ -67,7 +68,40 @@ export interface IngestInput {
   llmCfg?: TenantLlmCfg;
 }
 
-/** Dokument anlegen + (falls Key vorhanden) chunken/embedden. */
+/**
+ * Embeddet einen Dokumenttext und ermittelt dabei einen klaren Fehlergrund, der am
+ * Dokument (ingest_error) gespeichert wird – damit man im Dashboard sieht, WARUM
+ * keine Embeddings entstanden sind.
+ */
+async function embedAndRecordError(
+  tenantId: string,
+  documentId: string,
+  text: string,
+  metadata: Record<string, unknown>,
+  llmCfg: TenantLlmCfg,
+): Promise<{ chunks: number; error?: string }> {
+  let chunks = 0;
+  let error: string | undefined;
+  if (!hasEmbeddings(llmCfg)) {
+    error = 'Kein MISTRAL_API_KEY am Backend gesetzt – es wurden keine Embeddings erzeugt.';
+  } else if (!text || !text.trim()) {
+    error = 'Kein Textinhalt zum Embedden (Seite leer / nur Bilder/Skripte?).';
+  } else {
+    try {
+      chunks = await embedAndStore(tenantId, documentId, text, metadata, llmCfg);
+      if (chunks === 0) error = 'Kein verwertbarer Text nach Bereinigung (zu kurz).';
+    } catch (e) {
+      error = `Embedding-Aufruf fehlgeschlagen: ${(e as Error).message}`;
+    }
+  }
+  await tdb()
+    .update(kbDocuments)
+    .set({ ingestError: error ?? null })
+    .where(eq(kbDocuments.id, documentId));
+  return { chunks, error };
+}
+
+/** Dokument anlegen + (falls möglich) chunken/embedden. Fehlergrund wird gespeichert. */
 export async function ingestDocument(tenantId: string, input: IngestInput): Promise<IngestResult> {
   const db = tdb();
   const [doc] = await db
@@ -84,14 +118,14 @@ export async function ingestDocument(tenantId: string, input: IngestInput): Prom
     .returning();
 
   const documentId = doc!.id;
-  const chunks = await embedAndStore(
+  const { chunks, error } = await embedAndRecordError(
     tenantId,
     documentId,
     input.content,
     { sourceUrl: input.sourceUrl ?? null, sourceType: input.sourceType },
     input.llmCfg ?? {},
   );
-  return { documentId, chunks, embedded: chunks > 0 };
+  return { documentId, chunks, embedded: chunks > 0, error };
 }
 
 /** Bestehendes Dokument neu indexieren (z.B. nach Inhalts-/Provideränderung). */
@@ -111,14 +145,14 @@ export async function reindexDocument(
     .delete(kbChunks)
     .where(and(eq(kbChunks.documentId, documentId), eq(kbChunks.tenantId, tenantId)));
 
-  const chunks = await embedAndStore(
+  const { chunks, error } = await embedAndRecordError(
     tenantId,
     documentId,
     doc.rawContent,
     { sourceUrl: doc.sourceUrl, sourceType: doc.sourceType },
     llmCfg,
   );
-  return { documentId, chunks, embedded: chunks > 0 };
+  return { documentId, chunks, embedded: chunks > 0, error };
 }
 
 /** Einzelne URL holen, extrahieren und ingesten. */
@@ -142,10 +176,13 @@ export async function ingestUrl(
 
 export interface CrawlResult {
   pagesFound: number;
+  embedded: number;
+  failed: number;
+  errors: string[];
   documents: Array<{ url: string } & IngestResult>;
 }
 
-/** Website crawlen und alle Seiten als Dokumente ingesten. */
+/** Website crawlen und alle Seiten als Dokumente ingesten – mit Fehler-Zusammenfassung. */
 export async function crawlAndIngest(
   tenantId: string,
   startUrl: string,
@@ -154,17 +191,37 @@ export async function crawlAndIngest(
 ): Promise<CrawlResult> {
   const pages = await crawlSite(startUrl, maxPages);
   const documents: Array<{ url: string } & IngestResult> = [];
+  const errors: string[] = [];
+  let embedded = 0;
+  let failed = 0;
+
   for (const p of pages) {
-    const res = await ingestDocument(tenantId, {
-      sourceType: 'url',
-      sourceUrl: p.url,
-      title: p.title ?? p.url,
-      content: p.text,
-      llmCfg,
-    });
+    let res: IngestResult;
+    try {
+      res = await ingestDocument(tenantId, {
+        sourceType: 'url',
+        sourceUrl: p.url,
+        title: p.title ?? p.url,
+        content: p.text,
+        llmCfg,
+      });
+    } catch (e) {
+      res = { documentId: '', chunks: 0, embedded: false, error: `Ingest-Fehler: ${(e as Error).message}` };
+    }
+    if (res.embedded) embedded++;
+    if (res.error) {
+      failed++;
+      if (!errors.includes(res.error)) errors.push(res.error);
+    }
     documents.push({ url: p.url, ...res });
   }
-  return { pagesFound: pages.length, documents };
+
+  if (pages.length === 0) {
+    errors.push(
+      'Keine erreichbaren Seiten gefunden – mögliche Ursachen: Sitemap leer/fehlt, keine internen Links (BFS), robots/Timeout, oder die Seite rendert Inhalte erst per JavaScript.',
+    );
+  }
+  return { pagesFound: pages.length, embedded, failed, errors: errors.slice(0, 5), documents };
 }
 
 /** Entwurf freigeben: auf "published" setzen und (neu) embedden, damit retrievbar. */
@@ -191,6 +248,7 @@ export async function listDocuments(tenantId: string) {
       sourceUrl: kbDocuments.sourceUrl,
       title: kbDocuments.title,
       status: kbDocuments.status,
+      ingestError: kbDocuments.ingestError,
       createdAt: kbDocuments.createdAt,
       chunkCount: sql<number>`(select count(*)::int from kb_chunks c where c.document_id = ${kbDocuments.id})`,
     })

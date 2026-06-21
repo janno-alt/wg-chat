@@ -21,9 +21,33 @@ export function KnowledgeBase({ api, siteKey }: { api: Api; siteKey: string }) {
 
   const [crawlUrl, setCrawlUrl] = useState('');
   const [maxPages, setMaxPages] = useState(20);
+  const [crawlMsg, setCrawlMsg] = useState<string | null>(null);
+  const [crawlErr, setCrawlErr] = useState(false);
   const [url, setUrl] = useState('');
   const [q, setQ] = useState('');
   const [a, setA] = useState('');
+
+  async function doCrawl() {
+    if (!crawlUrl) return;
+    setBusy(true);
+    setCrawlErr(false);
+    setCrawlMsg('Crawle …');
+    try {
+      const r = await api.crawl(siteKey, crawlUrl, maxPages);
+      let msg = `${r.pagesFound} Seite(n) gefunden · ${r.embedded} mit Embeddings · ${r.failed} ohne.`;
+      if (r.errors.length) {
+        msg += ' Grund: ' + r.errors.join(' | ');
+        setCrawlErr(true);
+      }
+      setCrawlMsg(msg);
+      reload();
+    } catch (e) {
+      setCrawlErr(true);
+      setCrawlMsg(`Fehler: ${(e as Error)?.message ?? String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   // Wissen testen
   const [testQuery, setTestQuery] = useState('');
@@ -78,9 +102,12 @@ export function KnowledgeBase({ api, siteKey }: { api: Api; siteKey: string }) {
             <Input placeholder="https://kunde.example" value={crawlUrl} onChange={(e) => setCrawlUrl(e.currentTarget.value)} />
             <div className="flex items-center gap-2">
               <Input type="number" value={maxPages} onChange={(e) => setMaxPages(Number(e.currentTarget.value))} />
-              <Button disabled={busy || !crawlUrl} onClick={() => run(() => api.crawl(siteKey, crawlUrl, maxPages))}>Crawlen</Button>
+              <Button disabled={busy || !crawlUrl} onClick={doCrawl}>Crawlen</Button>
             </div>
             <p className="text-xs text-slate-400">Sitemap bevorzugt, sonst BFS. Erzeugt Embeddings.</p>
+            {crawlMsg && (
+              <p className={`text-xs ${crawlErr ? 'text-red-600' : 'text-slate-600'}`}>{crawlMsg}</p>
+            )}
           </div>
         </Card>
 
@@ -176,7 +203,10 @@ export function KnowledgeBase({ api, siteKey }: { api: Api; siteKey: string }) {
                             {d.chunkCount} Chunk(s) {expanded[d.id] ? '▲' : '▼'}
                           </button>
                         ) : (
-                          <Badge tone="amber">keine Embeddings</Badge>
+                          <div>
+                            <Badge tone="amber">keine Embeddings</Badge>
+                            {d.ingestError && <div className="mt-1 max-w-xs text-xs text-red-600">{d.ingestError}</div>}
+                          </div>
                         )}
                       </td>
                       <td className="py-2 pr-3">
