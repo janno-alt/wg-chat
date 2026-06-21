@@ -15,8 +15,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@fastify/cookie": "^11.0.1",
     "@fastify/cors": "^10.0.1",
     "@fastify/sensible": "^6.0.2",
+    "@fastify/static": "^8.0.3",
     "@fastify/websocket": "^11.0.1",
     "@wg-chat/shared": "*",
     "dotenv": "^16.4.7",

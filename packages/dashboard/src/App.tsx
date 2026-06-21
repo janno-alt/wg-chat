@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { createApi, type Api } from './api.js';
+import { useEffect, useMemo, useState } from 'react';
+import { createApi, type Api, type AuthUser } from './api.js';
 import { Badge, Button, Card, ErrorNote, Field, Input, Spinner, useAsync } from './components/ui.js';
 import { KnowledgeBase } from './tabs/KnowledgeBase.js';
 import { Conversations } from './tabs/Conversations.js';
@@ -9,49 +9,41 @@ import { Costs } from './tabs/Costs.js';
 import { Settings } from './tabs/Settings.js';
 import { Live } from './tabs/Live.js';
 
-const CFG_KEY = 'wg-dash:cfg';
-interface Cfg {
-  baseUrl: string;
-  key: string;
-}
-
-function loadCfg(): Cfg | null {
-  try {
-    const raw = localStorage.getItem(CFG_KEY);
-    return raw ? (JSON.parse(raw) as Cfg) : null;
-  } catch {
-    return null;
-  }
-}
-
 export function App() {
-  const [cfg, setCfg] = useState<Cfg | null>(loadCfg());
-  const api = useMemo(() => (cfg ? createApi(cfg.baseUrl, cfg.key) : null), [cfg]);
+  const api = useMemo(() => createApi(), []);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [checking, setChecking] = useState(true);
 
-  if (!cfg || !api) {
+  useEffect(() => {
+    api.me().then((u) => {
+      setUser(u);
+      setChecking(false);
+    });
+  }, [api]);
+
+  if (checking) {
     return (
-      <Login
-        onLogin={(c) => {
-          localStorage.setItem(CFG_KEY, JSON.stringify(c));
-          setCfg(c);
-        }}
-      />
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <Spinner label="Lädt …" />
+      </div>
     );
   }
+  if (!user) return <Login api={api} onLogin={setUser} />;
   return (
     <Shell
       api={api}
-      onLogout={() => {
-        localStorage.removeItem(CFG_KEY);
-        setCfg(null);
+      user={user}
+      onLogout={async () => {
+        await api.logout();
+        setUser(null);
       }}
     />
   );
 }
 
-function Login({ onLogin }: { onLogin: (c: Cfg) => void }) {
-  const [baseUrl, setBaseUrl] = useState('http://localhost:8787');
-  const [key, setKey] = useState('');
+function Login({ api, onLogin }: { api: Api; onLogin: (u: AuthUser) => void }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -59,8 +51,8 @@ function Login({ onLogin }: { onLogin: (c: Cfg) => void }) {
     setBusy(true);
     setError(null);
     try {
-      await createApi(baseUrl, key).listTenants(); // Zugang prüfen
-      onLogin({ baseUrl, key });
+      const res = await api.login(email, password);
+      onLogin(res.user);
     } catch (e) {
       setError(`Anmeldung fehlgeschlagen: ${(e as Error)?.message ?? String(e)}`);
     } finally {
@@ -72,16 +64,31 @@ function Login({ onLogin }: { onLogin: (c: Cfg) => void }) {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
       <div className="w-full max-w-sm">
         <h1 className="mb-1 text-2xl font-semibold text-slate-800">wg-chat</h1>
-        <p className="mb-5 text-sm text-slate-500">Dashboard – mit dem Admin-Schlüssel anmelden.</p>
+        <p className="mb-5 text-sm text-slate-500">Bitte anmelden.</p>
         <Card>
-          <div className="space-y-3">
-            <Field label="Backend-URL"><Input value={baseUrl} onChange={(e) => setBaseUrl(e.currentTarget.value)} /></Field>
-            <Field label="Admin-Schlüssel (x-admin-key)">
-              <Input type="password" value={key} onChange={(e) => setKey(e.currentTarget.value)} />
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void submit();
+            }}
+          >
+            <Field label="E-Mail">
+              <Input type="email" value={email} onChange={(e) => setEmail(e.currentTarget.value)} autoComplete="username" />
+            </Field>
+            <Field label="Passwort">
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.currentTarget.value)}
+                autoComplete="current-password"
+              />
             </Field>
             {error && <ErrorNote error={error} />}
-            <Button type="submit" disabled={busy || !key} onClick={submit}>{busy ? 'Prüfe …' : 'Anmelden'}</Button>
-          </div>
+            <Button type="submit" disabled={busy || !email || !password}>
+              {busy ? 'Anmelden …' : 'Anmelden'}
+            </Button>
+          </form>
         </Card>
       </div>
     </div>
@@ -98,7 +105,7 @@ const TABS = [
   { id: 'settings', label: 'Einstellungen', C: Settings },
 ] as const;
 
-function Shell({ api, onLogout }: { api: Api; onLogout: () => void }) {
+function Shell({ api, user, onLogout }: { api: Api; user: AuthUser; onLogout: () => void }) {
   const { data: tenants, loading, error, reload } = useAsync(() => api.listTenants(), []);
   const [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('kb');
@@ -108,11 +115,13 @@ function Shell({ api, onLogout }: { api: Api; onLogout: () => void }) {
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-800">
-      {/* Sidebar */}
       <aside className="flex w-64 flex-col border-r border-slate-200 bg-white">
         <div className="border-b border-slate-100 px-4 py-3">
           <div className="text-lg font-semibold text-teal-700">wg-chat</div>
-          <button onClick={onLogout} className="text-xs text-slate-400 hover:text-slate-700">Abmelden</button>
+          <div className="flex items-center justify-between">
+            <span className="truncate text-xs text-slate-400" title={user.email}>{user.email}</span>
+            <button onClick={onLogout} className="text-xs text-slate-400 hover:text-slate-700">Abmelden</button>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
           <div className="px-2 py-1 text-xs font-medium uppercase text-slate-400">Kunden</div>
@@ -139,7 +148,6 @@ function Shell({ api, onLogout }: { api: Api; onLogout: () => void }) {
         </div>
       </aside>
 
-      {/* Main */}
       <main className="flex-1 overflow-y-auto">
         {!activeSiteKey ? (
           <div className="p-10 text-slate-400">Lege links einen Kunden an, um zu starten.</div>

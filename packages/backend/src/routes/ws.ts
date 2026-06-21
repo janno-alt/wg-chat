@@ -3,6 +3,7 @@ import { getConfig } from '../config.js';
 import { resolveTenantBySiteKey } from '../services/tenant.js';
 import { addAgentMessage, getConversation, setHandedOff } from '../services/conversation.js';
 import { hub, type WsLike } from '../services/hub.js';
+import { getSessionUser } from './auth.js';
 
 interface AgentQuery {
   siteKey?: string;
@@ -23,8 +24,14 @@ interface VisitorQuery {
 export async function wsRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: AgentQuery }>('/ws/agent', { websocket: true }, async (socket, req) => {
     const { siteKey, key } = req.query;
+    if (!siteKey) {
+      socket.close();
+      return;
+    }
+    // Auth per Session-Cookie (Dashboard) ODER x-admin-key (kept for MCP/Tools).
     const cfg = getConfig();
-    if (!cfg.ADMIN_API_KEY || key !== cfg.ADMIN_API_KEY || !siteKey) {
+    const keyOk = Boolean(cfg.ADMIN_API_KEY) && key === cfg.ADMIN_API_KEY;
+    if (!keyOk && !(await getSessionUser(req))) {
       socket.close();
       return;
     }

@@ -9,15 +9,18 @@ COPY package.json tsconfig.base.json ./
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/backend/package.json packages/backend/package.json
 COPY packages/widget/package.json packages/widget/package.json
+COPY packages/dashboard/package.json packages/dashboard/package.json
 RUN npm install
 
-# Shared + Backend + Widget (Widget wird mitgebaut und vom Backend unter /w.js serviert)
+# Shared + Backend + Widget + Dashboard
 COPY packages/shared packages/shared
 COPY packages/backend packages/backend
 COPY packages/widget packages/widget
+COPY packages/dashboard packages/dashboard
 
-# Widget bauen -> packages/widget/dist/w.js (vom Backend ausgeliefert)
-RUN npm run build --workspace @wg-chat/widget
+# Widget (-> /w.js) und Dashboard (-> / ) bauen, beide liefert das Backend aus
+RUN npm run build --workspace @wg-chat/widget \
+ && npm run build --workspace @wg-chat/dashboard
 
 WORKDIR /app/packages/backend
 EXPOSE 8787

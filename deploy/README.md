@@ -87,9 +87,11 @@ mw stack list           # Stack-ID herausfinden
 | Secret | Inhalt |
 |---|---|
 | `MITTWALD_API_TOKEN` | API-Token aus mStudio (Profil → API-Tokens) |
-| `POSTGRES_PASSWORD` | frei gewähltes DB-Passwort |
+| `POSTGRES_PASSWORD` | DB-Passwort – **nur Buchstaben/Zahlen** (URL-sicher!) |
 | `MISTRAL_API_KEY` | EU-LLM-Key von Mistral La Plateforme |
-| `ADMIN_API_KEY` | starker Schlüssel für die Admin-/Ingestion-API (`x-admin-key`) |
+| `ADMIN_API_KEY` | Schlüssel für den MCP-Server (`x-admin-key`) |
+| `SESSION_SECRET` | zufälliger String (≥16 Zeichen) zum Signieren der Login-Cookies |
+| `ADMIN_PASSWORD` | Passwort für den Dashboard-Login |
 
 `GITHUB_TOKEN` ist automatisch vorhanden (Push nach GHCR).
 
@@ -97,8 +99,9 @@ mw stack list           # Stack-ID herausfinden
 
 | Variable | Beispiel |
 |---|---|
-| `PUBLIC_BASE_URL` | `https://chat.kine.media` |
+| `PUBLIC_BASE_URL` | `https://chat.wg-digital.xyz` |
 | `MITTWALD_STACK_ID` | die Stack-ID aus Schritt 1 |
+| `ADMIN_EMAIL` | Login-E-Mail fürs Dashboard (Bootstrap-Admin) |
 
 ## 3. GHCR-Image für Mittwald zugänglich machen
 

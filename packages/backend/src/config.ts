@@ -32,6 +32,13 @@ const schema = z.object({
   CHUNK_MAX_CHARS: z.coerce.number().default(1000),
   CHUNK_OVERLAP: z.coerce.number().default(150),
 
+  // Dashboard-Login (Session-Cookie, kein Key im Link)
+  SESSION_SECRET: z.string().min(16).default('dev-insecure-session-secret-change-me'),
+  ADMIN_EMAIL: z.string().default(''), // Bootstrap-Admin beim Start (optional)
+  ADMIN_PASSWORD: z.string().default(''),
+  // Pfad zum gebauten Dashboard (leer = aus dem Image: ../../dashboard/dist)
+  DASHBOARD_DIST_DIR: z.string().default(''),
+
   // SMTP für Lead-Benachrichtigungen (optional; ohne SMTP_HOST = E-Mail deaktiviert)
   SMTP_HOST: z.string().default(''),
   SMTP_PORT: z.coerce.number().default(587),

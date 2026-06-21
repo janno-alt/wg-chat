@@ -16,6 +16,7 @@ import { getUsageSummary } from '../services/usage.js';
 import { listLeads } from '../services/lead.js';
 import { suggestGapAnswer } from '../services/gapsuggest.js';
 import { getTranscript, listConversations } from '../services/conversation.js';
+import { getSessionUser } from './auth.js';
 import {
   crawlAndIngest,
   deleteDocument,
@@ -34,13 +35,12 @@ import { generateFaqs } from '../services/faqgen.js';
  */
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', async (req, reply) => {
+    // Zugang per Dashboard-Session-Cookie ODER per x-admin-key (für den MCP-Server).
     const key = getConfig().ADMIN_API_KEY;
-    if (!key) {
-      return reply.code(503).send({ error: 'admin_disabled', message: 'ADMIN_API_KEY nicht gesetzt.' });
-    }
-    if (req.headers['x-admin-key'] !== key) {
-      return reply.code(401).send({ error: 'unauthorized', message: 'x-admin-key fehlt oder falsch.' });
-    }
+    if (key && req.headers['x-admin-key'] === key) return;
+    const user = await getSessionUser(req);
+    if (user) return;
+    return reply.code(401).send({ error: 'unauthorized', message: 'Anmeldung erforderlich.' });
   });
 
   const tenantOr404 = async (siteKey: string, reply: FastifyReply): Promise<ResolvedTenant | null> => {

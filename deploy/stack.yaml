@@ -32,14 +32,20 @@ services:
       NODE_ENV: production
       PORT: "8787"
       PUBLIC_BASE_URL: "{{ .Env.PUBLIC_BASE_URL }}"
+      # Hinweis: POSTGRES_PASSWORD URL-sicher wählen (nur Buchstaben/Zahlen),
+      # sonst muss es hier URL-kodiert werden (z.B. # -> %23).
       DATABASE_URL: "postgres://wgchat:{{ .Env.POSTGRES_PASSWORD }}@postgres:5432/wgchat"
       LLM_PROVIDER: mistral
       MISTRAL_API_KEY: "{{ .Env.MISTRAL_API_KEY }}"
       MISTRAL_CHAT_MODEL: mistral-small-latest
       MISTRAL_EMBED_MODEL: mistral-embed
       EMBEDDING_DIMENSIONS: "1024"
-      # Schlüssel für die gesicherte Admin-/Ingestion-API (KB pflegen, crawlen).
+      # Schlüssel für die gesicherte Admin-/Ingestion-API (KB pflegen, crawlen) – für den MCP-Server.
       ADMIN_API_KEY: "{{ .Env.ADMIN_API_KEY }}"
+      # Dashboard-Login: Cookie-Secret + Bootstrap-Admin.
+      SESSION_SECRET: "{{ .Env.SESSION_SECRET }}"
+      ADMIN_EMAIL: "{{ .Env.ADMIN_EMAIL }}"
+      ADMIN_PASSWORD: "{{ .Env.ADMIN_PASSWORD }}"
       # SMTP für Lead-Benachrichtigungen (optional; leeres SMTP_HOST = E-Mail aus).
       # Nur die Geheimnisse werden getemplatet; PORT/SECURE/FROM hier setzen.
       SMTP_HOST: "{{ .Env.SMTP_HOST }}"
