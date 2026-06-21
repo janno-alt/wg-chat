@@ -3,7 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { adminFetch, apiBase } from './client.js';
 
-const server = new McpServer({ name: 'kine-chat', version: '0.1.0' });
+const server = new McpServer({ name: 'wg-chat', version: '0.1.0' });
 
 type ToolResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
 
@@ -181,7 +181,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   // Logs NUR auf stderr (stdout ist dem MCP-Protokoll vorbehalten).
-  console.error(`kine-chat MCP-Server bereit. Backend: ${apiBase}`);
+  console.error(`wg-chat MCP-Server bereit. Backend: ${apiBase}`);
 }
 
 main().catch((err) => {

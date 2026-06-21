@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { ChatResponse } from '@kine-chat/shared';
+import type { ChatResponse } from '@wg-chat/shared';
 import { isOriginAllowed, resolveTenantBySiteKey } from '../services/tenant.js';
 import { runCascade } from '../services/cascade.js';
 import { hub } from '../services/hub.js';

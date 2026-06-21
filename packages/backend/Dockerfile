@@ -1,6 +1,6 @@
 # Backend-Container (läuft via tsx – kein separater Build-Schritt nötig).
 # Build-Context = Repo-Root (siehe docker-compose.yml), damit das npm-Workspace
-# inkl. @kine-chat/shared korrekt aufgelöst wird.
+# inkl. @wg-chat/shared korrekt aufgelöst wird.
 FROM node:22-alpine
 WORKDIR /app
 
@@ -17,7 +17,7 @@ COPY packages/backend packages/backend
 COPY packages/widget packages/widget
 
 # Widget bauen -> packages/widget/dist/w.js (vom Backend ausgeliefert)
-RUN npm run build --workspace @kine-chat/widget
+RUN npm run build --workspace @wg-chat/widget
 
 WORKDIR /app/packages/backend
 EXPOSE 8787

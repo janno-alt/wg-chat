@@ -8,7 +8,7 @@ import { STYLES } from './styles.js';
  * und rendert in einen isolierten Shadow DOM, damit das Host-Theme nichts überschreibt.
  */
 function init(): void {
-  if (document.getElementById('kine-chat-root')) return; // doppelte Einbindung vermeiden
+  if (document.getElementById('wg-chat-root')) return; // doppelte Einbindung vermeiden
 
   const script =
     (document.currentScript as HTMLScriptElement | null) ??
@@ -16,7 +16,7 @@ function init(): void {
 
   const siteKey = script?.dataset.tenant;
   if (!siteKey) {
-    console.warn('[kine-chat] data-tenant fehlt – Widget wird nicht geladen.');
+    console.warn('[wg-chat] data-tenant fehlt – Widget wird nicht geladen.');
     return;
   }
 
@@ -31,7 +31,7 @@ function init(): void {
   apiBase = apiBase || window.location.origin;
 
   const host = document.createElement('div');
-  host.id = 'kine-chat-root';
+  host.id = 'wg-chat-root';
   document.body.appendChild(host);
 
   const shadow = host.attachShadow({ mode: 'open' });

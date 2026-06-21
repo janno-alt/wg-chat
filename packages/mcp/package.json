@@ -1,10 +1,10 @@
 {
-  "name": "@kine-chat/mcp",
+  "name": "@wg-chat/mcp",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "bin": {
-    "kine-chat-mcp": "src/index.ts"
+    "wg-chat-mcp": "src/index.ts"
   },
   "scripts": {
     "start": "tsx src/index.ts",

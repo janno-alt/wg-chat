@@ -14,7 +14,7 @@ export default defineConfig({
   build: {
     lib: {
       entry: 'src/main.tsx',
-      name: 'KineChat',
+      name: 'WgChat',
       formats: ['iife'],
       fileName: () => 'w.js',
     },

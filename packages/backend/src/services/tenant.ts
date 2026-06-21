@@ -1,6 +1,6 @@
 import { desc, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-import type { WidgetConfig, QuickReply, OutreachTrigger } from '@kine-chat/shared';
+import type { WidgetConfig, QuickReply, OutreachTrigger } from '@wg-chat/shared';
 import { db } from '../db/client.js';
 import { tenants, tenantSettings, outreachTriggers } from '../db/schema.js';
 import { getConfig } from '../config.js';

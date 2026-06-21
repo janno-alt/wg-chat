@@ -1,4 +1,4 @@
-# kine-chat – lokaler/EU-Container-Stack.
+# wg-chat – lokaler/EU-Container-Stack.
 # Schnellstart:  cp .env.example .env  &&  docker compose up -d --build
 # Seed danach:   docker compose run --rm backend npm run seed
 services:
@@ -6,9 +6,9 @@ services:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: kine
-      POSTGRES_PASSWORD: kine
-      POSTGRES_DB: kinechat
+      POSTGRES_USER: wgchat
+      POSTGRES_PASSWORD: wgchat
+      POSTGRES_DB: wgchat
     ports:
       # Host-Port konfigurierbar – Default 5432 kollidiert ggf. mit einer
       # bereits laufenden Postgres (z.B. eurer CRM-DB). Dann POSTGRES_HOST_PORT setzen.
@@ -16,7 +16,7 @@ services:
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U kine -d kinechat']
+      test: ['CMD-SHELL', 'pg_isready -U wgchat -d wgchat']
       interval: 5s
       timeout: 5s
       retries: 12
@@ -30,7 +30,7 @@ services:
       NODE_ENV: production
       PORT: 8787
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8787}
-      DATABASE_URL: postgres://kine:kine@postgres:5432/kinechat
+      DATABASE_URL: postgres://wgchat:wgchat@postgres:5432/wgchat
       LLM_PROVIDER: mistral
       MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
       MISTRAL_CHAT_MODEL: ${MISTRAL_CHAT_MODEL:-mistral-small-latest}

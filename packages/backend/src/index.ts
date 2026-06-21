@@ -6,7 +6,7 @@ async function main() {
   const cfg = getConfig();
   const app = await buildServer();
   await app.listen({ port: cfg.PORT, host: '0.0.0.0' });
-  app.log.info(`kine-chat backend läuft auf ${cfg.PUBLIC_BASE_URL}`);
+  app.log.info(`wg-chat backend läuft auf ${cfg.PUBLIC_BASE_URL}`);
 }
 
 main().catch((err) => {

@@ -1,5 +1,5 @@
 {
-  "name": "kine-chat",
+  "name": "wg-chat",
   "version": "0.1.0",
   "private": true,
   "description": "Mandantenfähiges, EU-konformes KI-Chatbot-Produkt für WordPress-Kundenseiten (kine.media)",
@@ -12,14 +12,14 @@
     "packages/mcp"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace @kine-chat/backend",
-    "build": "npm run build --workspace @kine-chat/shared && npm run build --workspace @kine-chat/backend && npm run build --workspace @kine-chat/widget",
-    "migrate": "npm run migrate --workspace @kine-chat/backend",
-    "seed": "npm run seed --workspace @kine-chat/backend",
-    "widget:dev": "npm run dev --workspace @kine-chat/widget",
-    "widget:build": "npm run build --workspace @kine-chat/widget",
-    "dashboard:dev": "npm run dev --workspace @kine-chat/dashboard",
-    "dashboard:build": "npm run build --workspace @kine-chat/dashboard",
+    "dev": "npm run dev --workspace @wg-chat/backend",
+    "build": "npm run build --workspace @wg-chat/shared && npm run build --workspace @wg-chat/backend && npm run build --workspace @wg-chat/widget",
+    "migrate": "npm run migrate --workspace @wg-chat/backend",
+    "seed": "npm run seed --workspace @wg-chat/backend",
+    "widget:dev": "npm run dev --workspace @wg-chat/widget",
+    "widget:build": "npm run build --workspace @wg-chat/widget",
+    "dashboard:dev": "npm run dev --workspace @wg-chat/dashboard",
+    "dashboard:build": "npm run build --workspace @wg-chat/dashboard",
     "typecheck": "tsc -b --pretty",
     "db:up": "docker compose up -d postgres",
     "stack:up": "docker compose up -d --build"

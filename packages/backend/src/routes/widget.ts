@@ -27,7 +27,7 @@ export async function widgetRoutes(app: FastifyInstance): Promise<void> {
       return cache;
     } catch {
       reply.code(404).header('content-type', 'application/javascript; charset=utf-8');
-      return '/* kine-chat: Widget nicht gebaut. Bitte `npm run widget:build` ausführen. */';
+      return '/* wg-chat: Widget nicht gebaut. Bitte `npm run widget:build` ausführen. */';
     }
   });
 }

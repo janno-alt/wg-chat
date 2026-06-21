@@ -1,7 +1,7 @@
 import { extractLinks, extractText, type ExtractedPage } from './html.js';
 
 const SKIP_EXT = /\.(pdf|docx?|xlsx?|pptx?|jpe?g|png|gif|svg|webp|ico|zip|rar|gz|mp4|mp3|css|js|json|woff2?|ttf|eot)(\?|$)/i;
-const USER_AGENT = 'kine-chat-crawler/0.1 (+https://kine.media)';
+const USER_AGENT = 'wg-chat-crawler/0.1 (+https://kine.media)';
 
 async function fetchHtml(url: string, timeoutMs = 8000): Promise<string | null> {
   const ctrl = new AbortController();

@@ -9,7 +9,7 @@ async function main() {
   const transport = new StdioClientTransport({
     command: 'npx',
     args: ['tsx', 'src/index.ts'],
-    env: { ...process.env, KINE_CHAT_ADMIN_KEY: 'verify-dummy' },
+    env: { ...process.env, WG_CHAT_ADMIN_KEY: 'verify-dummy' },
   });
   const client = new Client({ name: 'verify', version: '0.0.0' });
   await client.connect(transport);

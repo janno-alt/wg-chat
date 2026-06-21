@@ -3,9 +3,9 @@ import { WebSocket } from 'ws';
 /**
  * Prüft, dass die WebSocket-Endpunkte existieren und ungültige Verbindungen
  * ablehnen (Auth/Validierung greifen VOR jedem DB-Zugriff). Braucht ein laufendes
- * Backend, aber keine DB. Start:  npm run verify:ws --workspace @kine-chat/backend
+ * Backend, aber keine DB. Start:  npm run verify:ws --workspace @wg-chat/backend
  */
-const base = process.env.KINE_WS ?? 'ws://localhost:8787';
+const base = process.env.WG_WS ?? 'ws://localhost:8787';
 
 function expectClose(path: string, label: string): Promise<void> {
   return new Promise((resolve, reject) => {

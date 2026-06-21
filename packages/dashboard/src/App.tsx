@@ -9,7 +9,7 @@ import { Costs } from './tabs/Costs.js';
 import { Settings } from './tabs/Settings.js';
 import { Live } from './tabs/Live.js';
 
-const CFG_KEY = 'kine-dash:cfg';
+const CFG_KEY = 'wg-dash:cfg';
 interface Cfg {
   baseUrl: string;
   key: string;
@@ -71,7 +71,7 @@ function Login({ onLogin }: { onLogin: (c: Cfg) => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
       <div className="w-full max-w-sm">
-        <h1 className="mb-1 text-2xl font-semibold text-slate-800">kine-chat</h1>
+        <h1 className="mb-1 text-2xl font-semibold text-slate-800">wg-chat</h1>
         <p className="mb-5 text-sm text-slate-500">Dashboard – mit dem Admin-Schlüssel anmelden.</p>
         <Card>
           <div className="space-y-3">
@@ -111,7 +111,7 @@ function Shell({ api, onLogout }: { api: Api; onLogout: () => void }) {
       {/* Sidebar */}
       <aside className="flex w-64 flex-col border-r border-slate-200 bg-white">
         <div className="border-b border-slate-100 px-4 py-3">
-          <div className="text-lg font-semibold text-teal-700">kine-chat</div>
+          <div className="text-lg font-semibold text-teal-700">wg-chat</div>
           <button onClick={onLogout} className="text-xs text-slate-400 hover:text-slate-700">Abmelden</button>
         </div>
         <div className="flex-1 overflow-y-auto p-2">

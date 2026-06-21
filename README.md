@@ -1,4 +1,4 @@
-# kine-chat
+# wg-chat
 
 Mandantenfähiges, EU-konformes **KI-Chatbot-Produkt** zum Einbetten auf WordPress-
 (und beliebigen) Kundenseiten. Zentraler Container-Dienst (Mittwald mStudio) +
@@ -84,7 +84,7 @@ landen in der Tabelle `llm_usage` (Grundlage der Pro-Kunde-Kostenübersicht).
 DB-freier Logik-Check (Chunking, HTML-Extraktion, Tokenizer, Kosten-Mathematik):
 
 ```bash
-npm run smoke --workspace @kine-chat/backend
+npm run smoke --workspace @wg-chat/backend
 ```
 
 ## Wissensdatenbank pflegen (Admin-API, Phase 2)
@@ -169,7 +169,7 @@ Der Server umhüllt die Admin-REST-API (keine direkte DB/LLM-Anbindung).
 
 ```bash
 # Schnelltest (spawnt den Server, listet die Tools – ohne laufendes Backend):
-npm run verify --workspace @kine-chat/mcp
+npm run verify --workspace @wg-chat/mcp
 ```
 
 Beispiel-Eintrag in der MCP-Host-Konfiguration (z. B. Claude):
@@ -177,12 +177,12 @@ Beispiel-Eintrag in der MCP-Host-Konfiguration (z. B. Claude):
 ```json
 {
   "mcpServers": {
-    "kine-chat": {
+    "wg-chat": {
       "command": "npx",
       "args": ["tsx", "/Users/jannofleischer/MCP/Chatbot/packages/mcp/src/index.ts"],
       "env": {
-        "KINE_CHAT_API": "https://chat.kine.media",
-        "KINE_CHAT_ADMIN_KEY": "<dein-admin-key>"
+        "WG_CHAT_API": "https://chat.kine.media",
+        "WG_CHAT_ADMIN_KEY": "<dein-admin-key>"
       }
     }
   }

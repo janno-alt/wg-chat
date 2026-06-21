@@ -1,5 +1,5 @@
 import { and, asc, desc, eq } from 'drizzle-orm';
-import type { AnswerSource } from '@kine-chat/shared';
+import type { AnswerSource } from '@wg-chat/shared';
 import { db } from '../db/client.js';
 import { conversations, messages } from '../db/schema.js';
 

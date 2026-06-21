@@ -1,6 +1,6 @@
 # Deployment nach Mittwald mStudio
 
-Ziel: kine-chat als **Container-Stack** (Backend + Postgres/pgvector) im Mittwald
+Ziel: wg-chat als **Container-Stack** (Backend + Postgres/pgvector) im Mittwald
 mStudio, Image über **GitHub Container Registry (GHCR)**, Auslieferung per GitHub
 Actions. Alles in der EU (DE) → DSGVO-konform.
 
@@ -49,7 +49,7 @@ mw stack list           # Stack-ID herausfinden
 ## 3. GHCR-Image für Mittwald zugänglich machen
 
 Das Backend-Image liegt nach dem ersten Build unter
-`ghcr.io/<owner>/kine-chat-backend`. Mittwald muss es ziehen können – eine Variante:
+`ghcr.io/<owner>/wg-chat-backend`. Mittwald muss es ziehen können – eine Variante:
 
 - **Privat (empfohlen):** Registry-Zugang in mStudio hinterlegen –
   ```bash

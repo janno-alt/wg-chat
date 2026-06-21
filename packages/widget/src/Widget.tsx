@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import type { WidgetConfig, QuickReply } from '@kine-chat/shared';
+import type { WidgetConfig, QuickReply } from '@wg-chat/shared';
 import { createApi } from './api.js';
 import { getSessionId } from './session.js';
 import { startOutreach } from './outreach.js';
@@ -64,7 +64,7 @@ export function App({ siteKey, apiBase }: Props) {
         });
       })
       .catch((err) => {
-        console.warn('[kine-chat] Konfiguration konnte nicht geladen werden:', err);
+        console.warn('[wg-chat] Konfiguration konnte nicht geladen werden:', err);
         // Minimal-Fallback, damit das Widget trotzdem sichtbar ist
         setConfig({
           tenantId: '',
@@ -135,7 +135,7 @@ export function App({ siteKey, apiBase }: Props) {
       if (res.quickReplies?.length) setQuick(res.quickReplies);
       if (res.escalate) setShowLead(false); // Lead-Formular erst auf Klick
     } catch (err) {
-      console.warn('[kine-chat] Chat-Fehler:', err);
+      console.warn('[wg-chat] Chat-Fehler:', err);
       setMessages((m) => [
         ...m,
         { role: 'bot', text: 'Entschuldigung, es gab ein technisches Problem. Bitte später erneut versuchen.' },
@@ -182,7 +182,7 @@ export function App({ siteKey, apiBase }: Props) {
       setLeadDone(true);
       setMessages((m) => [...m, { role: 'bot', text: 'Danke! Wir melden uns zeitnah bei dir. 🙌' }]);
     } catch (err) {
-      console.warn('[kine-chat] Lead-Fehler:', err);
+      console.warn('[wg-chat] Lead-Fehler:', err);
       setMessages((m) => [
         ...m,
         { role: 'bot', text: 'Das konnte leider nicht gesendet werden. Bitte später erneut versuchen.' },
@@ -273,7 +273,7 @@ export function App({ siteKey, apiBase }: Props) {
             </div>
           )}
 
-          <div class="kc-foot">Powered by kine-chat</div>
+          <div class="kc-foot">Powered by wg-chat</div>
         </div>
       )}
 

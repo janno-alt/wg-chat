@@ -1,6 +1,6 @@
 /** Stabile, pro Tenant getrennte Session-ID im localStorage (für Konversations-Kontinuität). */
 export function getSessionId(siteKey: string): string {
-  const key = `kine-chat:sid:${siteKey}`;
+  const key = `wg-chat:sid:${siteKey}`;
   try {
     let v = localStorage.getItem(key);
     if (!v) {

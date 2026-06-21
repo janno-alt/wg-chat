@@ -41,7 +41,7 @@ const schema = z.object({
     .transform((v) => v === 'true'),
   SMTP_USER: z.string().default(''),
   SMTP_PASS: z.string().default(''),
-  SMTP_FROM: z.string().default('kine-chat <no-reply@kine.media>'),
+  SMTP_FROM: z.string().default('wg-chat <no-reply@kine.media>'),
 
   ALLOW_ALL_ORIGINS: z
     .enum(['true', 'false'])

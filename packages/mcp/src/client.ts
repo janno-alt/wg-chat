@@ -3,8 +3,8 @@
  * des Backends (x-admin-key) – KEINE direkte DB-/LLM-Anbindung. So bleibt die
  * gesamte Logik (Kaskade, Ingestion, Kosten) an einer Stelle im Backend.
  */
-const API = (process.env.KINE_CHAT_API ?? 'http://localhost:8787').replace(/\/$/, '');
-const KEY = process.env.KINE_CHAT_ADMIN_KEY ?? '';
+const API = (process.env.WG_CHAT_API ?? 'http://localhost:8787').replace(/\/$/, '');
+const KEY = process.env.WG_CHAT_ADMIN_KEY ?? '';
 
 export const apiBase = API;
 export const hasKey = Boolean(KEY);
@@ -15,7 +15,7 @@ export async function adminFetch<T = unknown>(
   body?: unknown,
 ): Promise<T> {
   if (!KEY) {
-    throw new Error('KINE_CHAT_ADMIN_KEY ist nicht gesetzt – Admin-Zugriff nicht möglich.');
+    throw new Error('WG_CHAT_ADMIN_KEY ist nicht gesetzt – Admin-Zugriff nicht möglich.');
   }
   const res = await fetch(`${API}/api/admin${path}`, {
     method,

@@ -4,7 +4,7 @@ import type {
   ChatResponse,
   LeadRequest,
   LeadResponse,
-} from '@kine-chat/shared';
+} from '@wg-chat/shared';
 
 export interface WidgetApi {
   getConfig(): Promise<WidgetConfig>;

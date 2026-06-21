@@ -1,4 +1,4 @@
-# Mittwald Container-Stack für kine-chat.
+# Mittwald Container-Stack für wg-chat.
 # Wird von der GitHub Action `mittwald/deploy-container-action@v1` deployt
 # (siehe .github/workflows/deploy.yml). Platzhalter `{{ .Env.X }}` werden zur
 # Deploy-Zeit aus den Workflow-Env-Variablen / GitHub-Secrets aufgelöst –
@@ -12,11 +12,11 @@ services:
   # Das pgvector-Image enthält die Extension -> `CREATE EXTENSION vector` klappt.
   postgres:
     image: "pgvector/pgvector:pg16"
-    description: "kine-chat PostgreSQL + pgvector"
+    description: "wg-chat PostgreSQL + pgvector"
     environment:
-      POSTGRES_USER: kine
+      POSTGRES_USER: wgchat
       POSTGRES_PASSWORD: "{{ .Env.POSTGRES_PASSWORD }}"
-      POSTGRES_DB: kinechat
+      POSTGRES_DB: wgchat
     volumes:
       # Persistenz; wird mit den Mittwald-Projekt-Backups gesichert.
       - "pgdata:/var/lib/postgresql/data"
@@ -25,14 +25,14 @@ services:
   # über den Service-Namen "postgres" (Mittwald-internes Netzwerk).
   backend:
     image: "{{ .Env.IMAGE_TAG }}"
-    description: "kine-chat Backend + Widget"
+    description: "wg-chat Backend + Widget"
     ports:
       - "8787/tcp"
     environment:
       NODE_ENV: production
       PORT: "8787"
       PUBLIC_BASE_URL: "{{ .Env.PUBLIC_BASE_URL }}"
-      DATABASE_URL: "postgres://kine:{{ .Env.POSTGRES_PASSWORD }}@postgres:5432/kinechat"
+      DATABASE_URL: "postgres://wgchat:{{ .Env.POSTGRES_PASSWORD }}@postgres:5432/wgchat"
       LLM_PROVIDER: mistral
       MISTRAL_API_KEY: "{{ .Env.MISTRAL_API_KEY }}"
       MISTRAL_CHAT_MODEL: mistral-small-latest
@@ -47,7 +47,7 @@ services:
       SMTP_PASS: "{{ .Env.SMTP_PASS }}"
       SMTP_PORT: "587"
       SMTP_SECURE: "false"
-      SMTP_FROM: "kine-chat <no-reply@kine.media>"
+      SMTP_FROM: "wg-chat <no-reply@kine.media>"
       # In Produktion Origin-Prüfung aktiv lassen: jeder Tenant muss seine
       # erlaubten Domains gepflegt haben. Für die allererste Inbetriebnahme
       # ggf. temporär auf "true".

@@ -1,4 +1,4 @@
-import type { OutreachTrigger } from '@kine-chat/shared';
+import type { OutreachTrigger } from '@wg-chat/shared';
 
 /**
  * Clientseitige Outreach-Engine. Beobachtet Nutzerverhalten und feuert pro Trigger
@@ -96,7 +96,7 @@ function pathMatches(pattern: string, path: string): boolean {
 }
 
 function firedKey(siteKey: string): string {
-  return `kine-chat:fired:${siteKey}`;
+  return `wg-chat:fired:${siteKey}`;
 }
 function firedSet(siteKey: string): Set<string> {
   try {

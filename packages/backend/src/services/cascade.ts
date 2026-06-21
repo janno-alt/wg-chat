@@ -1,5 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm';
-import type { ChatRequest, ChatResponse, QuickReply } from '@kine-chat/shared';
+import type { ChatRequest, ChatResponse, QuickReply } from '@wg-chat/shared';
 import { db } from '../db/client.js';
 import { knowledgeGaps } from '../db/schema.js';
 import { getProviderForTenant } from '../llm/index.js';

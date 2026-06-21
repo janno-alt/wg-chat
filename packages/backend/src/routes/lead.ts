@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { LeadResponse } from '@kine-chat/shared';
+import type { LeadResponse } from '@wg-chat/shared';
 import { isOriginAllowed, resolveTenantBySiteKey } from '../services/tenant.js';
 import { createLead, dispatchLeadNotifications } from '../services/lead.js';
 
