@@ -83,7 +83,7 @@ export async function runCascade(
     }
 
     // ── Stufe 4+5: Retrieval → kuratierte Antwort ODER LLM-Zusammenfassung ──
-    const hits = await searchChunks(t.id, embedding, 6);
+    const hits = await searchChunks(t.id, embedding, 5);
     const ans = await answerFromHits(t, req.message, hits, th, provider, conv.id, log);
     if (ans) {
       await addBotMessage({
@@ -115,14 +115,18 @@ function cleanContext(s: string): string {
 
 function buildSystemPrompt(tenantName: string, context: string): string {
   return (
-    `Du bist der freundliche, kompetente Kundenberater von "${tenantName}". Beantworte die Frage ` +
-    `in eigenen Worten, natürlich und hilfreich – wie ein gut informierter Mitarbeiter im Gespräch. ` +
-    `Sei fundiert: nimm ALLE relevanten Details aus dem Kontext zusammen (Leistungen, Ablauf, Preise, ` +
-    `Vorteile, nächste Schritte) und erkläre sie verständlich in 3–6 Sätzen statt nur knapp. ` +
-    `Stütze dich AUSSCHLIESSLICH auf den Kontext und fasse zusammen, statt zu zitieren. Gib NIEMALS ` +
-    `HTML, Code, Menüpunkte oder rohe Textfragmente aus. Wenn sinnvoll, schließe mit einem konkreten ` +
-    `nächsten Schritt (z. B. Kontakt/Angebot). Steht die Antwort nicht im Kontext, sage höflich, dass ` +
-    `du das ans Team weiterleitest – erfinde nichts.\n\nKontext:\n${context}`
+    `Du bist der Kundenberater von "${tenantName}". Beantworte die Frage KURZ und PRÄZISE ` +
+    `(höchstens 2–3 Sätze) und AUSSCHLIESSLICH mit Informationen, die wörtlich im Kontext stehen.\n` +
+    `Strikte Regeln:\n` +
+    `- Erfinde nichts und rate nicht. Nenne KEINE Beispiele, Branchen, Anwendungsfälle, Zahlen oder ` +
+    `Pakete, die nicht ausdrücklich im Kontext stehen.\n` +
+    `- Verwechsle nichts: unterscheide klar zwischen verschiedenen Angeboten (z. B. einmalige Leistung ` +
+    `vs. monatliche Wartung) und vermische sie nicht.\n` +
+    `- Keine Werbefloskeln, kein Ausschweifen, keine selbst ausgedachten Szenarien.\n` +
+    `- Gib niemals HTML, Code oder rohe Seitenfragmente aus.\n` +
+    `- Steht die Antwort nicht eindeutig im Kontext, antworte in EINEM Satz, dass du das ans Team ` +
+    `weiterleitest – ohne Details zu erfinden.\n\n` +
+    `Kontext:\n${context}`
   );
 }
 
@@ -165,7 +169,7 @@ export async function answerFromHits(
     }
     const context = hits
       .filter((h) => h.similarity >= th.rag)
-      .slice(0, 6)
+      .slice(0, 4)
       .map((h, i) => `[${i + 1}] ${cleanContext(h.content)}`)
       .join('\n\n');
     if (!context) return null;
@@ -175,7 +179,7 @@ export async function answerFromHits(
           { role: 'system', content: buildSystemPrompt(t.name, context) },
           { role: 'user', content: question },
         ],
-        { temperature: 0.3, maxTokens: 700 },
+        { temperature: 0.1, maxTokens: 350 },
       );
       await recordUsage({
         tenantId: t.id,
