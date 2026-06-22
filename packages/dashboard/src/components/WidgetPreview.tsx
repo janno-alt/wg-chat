@@ -150,7 +150,7 @@ export function WidgetPreview({
         }}
       >
         {launcherIcon ? (
-          <img src={launcherIcon} alt="" style={{ width: '62%', height: '62%', objectFit: 'contain', borderRadius: 8 }} />
+          <img src={launcherIcon} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', display: 'block' }} />
         ) : (
           '💬'
         )}
