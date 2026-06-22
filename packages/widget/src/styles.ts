@@ -22,7 +22,8 @@ export const STYLES = /* css */ `
   font-size: 26px; transition: transform .15s ease;
 }
 .kc-launcher:hover { transform: scale(1.06); }
-.kc-launcher-img { width: 62%; height: 62%; object-fit: contain; border-radius: 8px; }
+.kc-launcher { overflow: hidden; }
+.kc-launcher-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 
 .kc-teaser {
   position: absolute; bottom: 74px; max-width: 260px;
