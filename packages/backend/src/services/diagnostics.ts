@@ -58,6 +58,23 @@ async function tableExists(qualified: string): Promise<boolean> {
 }
 
 /**
+ * Leert NUR den semantischen Cache (= Konversationen/Nachrichten) eines Kunden, ohne
+ * die Wissensbasis anzufassen. Praktisch nach Prompt-Änderungen: dann formuliert der
+ * Bot neu, statt eine alte Antwort wiederzugeben. Messages gehen per FK-Cascade.
+ */
+export async function clearCache(schemaName: string | null, tenantId: string): Promise<number> {
+  const pool = getPool();
+  let n = 0;
+  if (schemaName && isValidSchema(schemaName) && (await tableExists(`${schemaName}.conversations`))) {
+    n += (await pool.query(`delete from "${schemaName}".conversations`)).rowCount ?? 0;
+  }
+  if (await tableExists('public.conversations')) {
+    n += (await pool.query('delete from public.conversations where tenant_id = $1', [tenantId])).rowCount ?? 0;
+  }
+  return n;
+}
+
+/**
  * Löscht ALLE Wissensbasis-Daten eines Kunden – im Kunden-Schema (komplett) und die
  * Alt-Daten im public-Schema (auf diesen Tenant beschränkt). Leert AUSSERDEM die
  * Konversationen (= semantischer Cache), damit keine alten, vor dem Fix gespeicherten
@@ -75,10 +92,6 @@ export async function purgeKb(schemaName: string | null, tenantId: string): Prom
     if (await tableExists(`${schemaName}.kb_documents`)) {
       res.schemaDocs = (await pool.query(`delete from ${s}.kb_documents`)).rowCount ?? 0;
     }
-    // Konversationen leeren → messages werden per FK-Cascade entfernt (Cache-Reset).
-    if (await tableExists(`${schemaName}.conversations`)) {
-      res.conversations = (await pool.query(`delete from ${s}.conversations`)).rowCount ?? 0;
-    }
   }
 
   if (await tableExists('public.kb_chunks')) {
@@ -87,10 +100,9 @@ export async function purgeKb(schemaName: string | null, tenantId: string): Prom
   if (await tableExists('public.kb_documents')) {
     res.publicDocs = (await pool.query('delete from public.kb_documents where tenant_id = $1', [tenantId])).rowCount ?? 0;
   }
-  if (await tableExists('public.conversations')) {
-    res.conversations +=
-      (await pool.query('delete from public.conversations where tenant_id = $1', [tenantId])).rowCount ?? 0;
-  }
+
+  // Cache (Konversationen) ebenfalls leeren, damit keine alten Antworten zurückkommen.
+  res.conversations = await clearCache(schemaName, tenantId);
   return res;
 }
 

@@ -115,16 +115,18 @@ function cleanContext(s: string): string {
 
 function buildSystemPrompt(tenantName: string, context: string): string {
   return (
-    `Du bist der Kundenberater von "${tenantName}". Beantworte die Frage KURZ und PRÄZISE ` +
-    `(höchstens 2–3 Sätze) und AUSSCHLIESSLICH mit Informationen, die wörtlich im Kontext stehen.\n` +
-    `Strikte Regeln:\n` +
-    `- Erfinde nichts und rate nicht. Nenne KEINE Beispiele, Branchen, Anwendungsfälle, Zahlen oder ` +
-    `Pakete, die nicht ausdrücklich im Kontext stehen.\n` +
-    `- Verwechsle nichts: unterscheide klar zwischen verschiedenen Angeboten (z. B. einmalige Leistung ` +
-    `vs. monatliche Wartung) und vermische sie nicht.\n` +
-    `- Keine Werbefloskeln, kein Ausschweifen, keine selbst ausgedachten Szenarien.\n` +
+    `Du bist der Kundenberater von "${tenantName}". Antworte natürlich und hilfreich in 2–3 Sätzen ` +
+    `– nicht länger, aber auch nicht nur ein knapper Halbsatz.\n` +
+    `Regeln:\n` +
+    `- Konkrete Fakten (Preise, Zahlen, Leistungen, Pakete) NUR, wenn sie wörtlich im Kontext stehen. ` +
+    `Erfinde nichts, nenne keine Beispiele, Branchen oder Anwendungsfälle, die nicht im Kontext stehen, ` +
+    `und vermische verschiedene Angebote nicht (z. B. einmalige Leistung ≠ monatliche Wartung).\n` +
+    `- Du darfst ohne neue Fakten allgemein ergänzen, dass der genaue Preis bzw. Umfang von den ` +
+    `individuellen Anforderungen abhängt.\n` +
+    `- Schließe – wenn es zur Frage passt – mit einer kurzen, freundlichen Einladung, für ein konkretes ` +
+    `Angebot oder Details eine Anfrage zu stellen. Dezent, nicht werblich oder aufdringlich.\n` +
     `- Gib niemals HTML, Code oder rohe Seitenfragmente aus.\n` +
-    `- Steht die Antwort nicht eindeutig im Kontext, antworte in EINEM Satz, dass du das ans Team ` +
+    `- Steht gar keine passende Information im Kontext, sage in einem Satz, dass du das ans Team ` +
     `weiterleitest – ohne Details zu erfinden.\n\n` +
     `Kontext:\n${context}`
   );
@@ -179,7 +181,7 @@ export async function answerFromHits(
           { role: 'system', content: buildSystemPrompt(t.name, context) },
           { role: 'user', content: question },
         ],
-        { temperature: 0.1, maxTokens: 350 },
+        { temperature: 0.2, maxTokens: 350 },
       );
       await recordUsage({
         tenantId: t.id,

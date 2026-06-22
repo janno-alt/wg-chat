@@ -78,6 +78,20 @@ export function KnowledgeBase({ api, siteKey }: { api: Api; siteKey: string }) {
     }
   }
 
+  // Cache leeren (nach Prompt-/Design-Änderungen), ohne neu zu crawlen
+  const [cacheBusy, setCacheBusy] = useState(false);
+  async function clearCache() {
+    setCacheBusy(true);
+    try {
+      const { cleared } = await api.clearCache(siteKey);
+      alert(`Cache geleert: ${cleared} Konversation(en) entfernt. Der Bot formuliert jetzt neu.`);
+    } catch (e) {
+      alert((e as Error)?.message ?? String(e));
+    } finally {
+      setCacheBusy(false);
+    }
+  }
+
   // Diagnose: wo liegen die Daten wirklich?
   const [diag, setDiag] = useState<KbDiagnostics | null>(null);
   const [diagBusy, setDiagBusy] = useState(false);
@@ -171,10 +185,14 @@ export function KnowledgeBase({ api, siteKey }: { api: Api; siteKey: string }) {
         </Card>
       </div>
 
-      <Card title="Wissen testen">
+      <Card
+        title="Wissen testen"
+        actions={<Button variant="ghost" disabled={cacheBusy} onClick={clearCache}>{cacheBusy ? 'Leere …' : 'Cache leeren'}</Button>}
+      >
         <p className="mb-2 text-xs text-slate-500">
           Tippe eine echte Kundenfrage – du siehst die <strong>tatsächliche Antwort des Bots</strong> (inkl. KI-Formulierung),
-          plus darunter die Belege aus der Wissensbasis mit Score.
+          plus darunter die Belege aus der Wissensbasis mit Score. „Cache leeren" verwirft alte Antworten,
+          damit der Bot nach Änderungen neu formuliert (ohne neu zu crawlen).
         </p>
         <div className="flex gap-2">
           <Input value={testQuery} placeholder="z. B. Was kostet eine Website?" onChange={(e) => setTestQuery(e.currentTarget.value)} onKeyDown={(e) => e.key === 'Enter' && testKnowledge()} />

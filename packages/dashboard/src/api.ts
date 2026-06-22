@@ -38,6 +38,7 @@ export interface Api {
   listChunks(siteKey: string, docId: string): Promise<Chunk[]>;
   kbDiagnostics(siteKey: string): Promise<KbDiagnostics>;
   purgeKb(siteKey: string): Promise<{ purged: PurgeResult }>;
+  clearCache(siteKey: string): Promise<{ cleared: number }>;
   searchKb(siteKey: string, query: string): Promise<SearchResult>;
   addManual(siteKey: string, body: Record<string, unknown>): Promise<unknown>;
   ingestUrl(siteKey: string, url: string): Promise<unknown>;
@@ -111,6 +112,7 @@ export function createApi(baseUrl = ''): Api {
     },
     kbDiagnostics: (siteKey) => admin<KbDiagnostics>('GET', `/${siteKey}/kb/diagnostics`),
     purgeKb: (siteKey) => admin<{ purged: PurgeResult }>('POST', `/${siteKey}/kb/purge`),
+    clearCache: (siteKey) => admin<{ cleared: number }>('POST', `/${siteKey}/cache/clear`),
     searchKb(siteKey, query) {
       return admin('POST', `/${siteKey}/kb/search`, { query });
     },

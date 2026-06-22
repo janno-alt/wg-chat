@@ -16,7 +16,7 @@ import { getUsageSummary } from '../services/usage.js';
 import { listLeads } from '../services/lead.js';
 import { suggestGapAnswer } from '../services/gapsuggest.js';
 import { testKnowledge } from '../services/kbsearch.js';
-import { kbDiagnostics, purgeKb } from '../services/diagnostics.js';
+import { kbDiagnostics, purgeKb, clearCache } from '../services/diagnostics.js';
 import { getTranscript, listConversations } from '../services/conversation.js';
 import { getSessionUser } from './auth.js';
 import {
@@ -219,6 +219,13 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const t = await tenantOr404(req.params.siteKey, reply);
     if (!t) return;
     return { purged: await purgeKb(t.schemaName, t.id) };
+  });
+
+  // ── Nur Cache leeren (Konversationen) – z.B. nach Prompt-/Design-Änderungen ──
+  app.post<{ Params: { siteKey: string } }>('/:siteKey/cache/clear', async (req, reply) => {
+    const t = await tenantOr404(req.params.siteKey, reply);
+    if (!t) return;
+    return { cleared: await clearCache(t.schemaName, t.id) };
   });
 
   // ── Wissen testen: Testfrage embedden + beste Treffer mit Score ──
