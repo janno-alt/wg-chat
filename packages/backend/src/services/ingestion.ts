@@ -241,7 +241,8 @@ export async function publishDocument(
 }
 
 export async function listDocuments(tenantId: string) {
-  return tdb()
+  const db = tdb();
+  const docs = await db
     .select({
       id: kbDocuments.id,
       sourceType: kbDocuments.sourceType,
@@ -250,11 +251,20 @@ export async function listDocuments(tenantId: string) {
       status: kbDocuments.status,
       ingestError: kbDocuments.ingestError,
       createdAt: kbDocuments.createdAt,
-      chunkCount: sql<number>`(select count(*)::int from kb_chunks c where c.document_id = ${kbDocuments.id})`,
     })
     .from(kbDocuments)
     .where(eq(kbDocuments.tenantId, tenantId))
     .orderBy(desc(kbDocuments.createdAt));
+
+  // Chunk-Zahl je Dokument separat (robust statt korrelierter Subquery) und in JS mergen.
+  const counts = await db
+    .select({ documentId: kbChunks.documentId, n: sql<number>`count(*)::int` })
+    .from(kbChunks)
+    .where(eq(kbChunks.tenantId, tenantId))
+    .groupBy(kbChunks.documentId);
+  const byDoc = new Map(counts.map((c) => [c.documentId, Number(c.n)]));
+
+  return docs.map((d) => ({ ...d, chunkCount: byDoc.get(d.id) ?? 0 }));
 }
 
 /** Die extrahierten/embeddeten Chunks eines Dokuments (für die „Wissen"-Ansicht). */
