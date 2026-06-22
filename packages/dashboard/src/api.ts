@@ -3,6 +3,7 @@ import type {
   CrawlSummary,
   KbDiagnostics,
   PurgeResult,
+  Opener,
   Gap,
   KbDoc,
   Lead,
@@ -47,6 +48,11 @@ export interface Api {
   publish(siteKey: string, docId: string): Promise<unknown>;
   faqgen(siteKey: string, docId: string, count: number): Promise<unknown>;
   deleteDoc(siteKey: string, docId: string): Promise<void>;
+
+  listOpeners(siteKey: string): Promise<Opener[]>;
+  addOpener(siteKey: string, body: { pageMatch?: string; text: string }): Promise<unknown>;
+  updateOpener(siteKey: string, id: string, patch: { active?: boolean; text?: string; pageMatch?: string }): Promise<void>;
+  deleteOpener(siteKey: string, id: string): Promise<void>;
 
   usage(siteKey: string): Promise<Usage>;
   gaps(siteKey: string): Promise<Gap[]>;
@@ -124,6 +130,17 @@ export function createApi(baseUrl = ''): Api {
     faqgen: (siteKey, docId, count) => admin('POST', `/${siteKey}/kb/${docId}/faqgen`, { count }),
     async deleteDoc(siteKey, docId) {
       await admin('DELETE', `/${siteKey}/kb/${docId}`);
+    },
+
+    async listOpeners(siteKey) {
+      return (await admin<{ openers: Opener[] }>('GET', `/${siteKey}/openers`)).openers;
+    },
+    addOpener: (siteKey, body) => admin('POST', `/${siteKey}/openers`, body),
+    async updateOpener(siteKey, id, patch) {
+      await admin('PATCH', `/${siteKey}/openers/${id}`, patch);
+    },
+    async deleteOpener(siteKey, id) {
+      await admin('DELETE', `/${siteKey}/openers/${id}`);
     },
 
     usage: (siteKey) => admin('GET', `/${siteKey}/usage`),

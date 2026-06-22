@@ -8,6 +8,7 @@ import { Gaps } from './tabs/Gaps.js';
 import { Costs } from './tabs/Costs.js';
 import { Settings } from './tabs/Settings.js';
 import { Live } from './tabs/Live.js';
+import { Openers } from './tabs/Openers.js';
 
 export function App() {
   const api = useMemo(() => createApi(), []);
@@ -97,6 +98,7 @@ function Login({ api, onLogin }: { api: Api; onLogin: (u: AuthUser) => void }) {
 
 const TABS = [
   { id: 'kb', label: 'Wissensbasis', C: KnowledgeBase },
+  { id: 'openers', label: 'Einstiege', C: Openers },
   { id: 'live', label: 'Live', C: Live },
   { id: 'conv', label: 'Konversationen', C: Conversations },
   { id: 'leads', label: 'Leads', C: Leads },

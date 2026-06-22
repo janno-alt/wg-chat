@@ -13,6 +13,7 @@ import { configRoutes } from './routes/config.js';
 import { chatRoutes } from './routes/chat.js';
 import { widgetRoutes } from './routes/widget.js';
 import { leadRoutes } from './routes/lead.js';
+import { outreachRoutes } from './routes/outreach.js';
 import { adminRoutes } from './routes/admin.js';
 import { wsRoutes } from './routes/ws.js';
 import { authRoutes } from './routes/auth.js';
@@ -46,6 +47,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(configRoutes);
   await app.register(chatRoutes);
   await app.register(leadRoutes);
+  await app.register(outreachRoutes);
   await app.register(authRoutes);
   await app.register(adminRoutes, { prefix: '/api/admin' });
 

@@ -186,6 +186,26 @@ export const outreachTriggers = pgTable(
   (t) => [index('outreach_tenant_idx').on(t.tenantId)],
 );
 
+// Seitenspezifische Gesprächseinstiege (KI-generiert beim Crawlen oder manuell),
+// A/B-getestet via impressions/engagements. Liegt im Kunden-Schema (pro Tenant).
+export const outreachOpeners = pgTable(
+  'outreach_openers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').notNull(),
+    // Pfad der Seite, zu der der Einstieg passt (Prefix-Match), z.B. /leistungen/wartung
+    pageMatch: text('page_match').notNull().default('/'),
+    text: text('text').notNull(),
+    active: boolean('active').notNull().default(true),
+    // ai | manual
+    source: varchar('source', { length: 8 }).notNull().default('ai'),
+    impressions: integer('impressions').notNull().default(0),
+    engagements: integer('engagements').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('outreach_openers_tenant_idx').on(t.tenantId)],
+);
+
 export const knowledgeGaps = pgTable('knowledge_gaps', {
   id: uuid('id').primaryKey().defaultRandom(),
   tenantId: uuid('tenant_id')

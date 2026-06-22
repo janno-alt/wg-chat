@@ -88,6 +88,17 @@ export interface Usage {
   byModel: UsageRow[];
 }
 
+export interface Opener {
+  id: string;
+  pageMatch: string;
+  text: string;
+  active: boolean;
+  source: string;
+  impressions: number;
+  engagements: number;
+  createdAt: string;
+}
+
 export interface Gap {
   id: string;
   question: string;

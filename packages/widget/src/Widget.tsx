@@ -38,10 +38,19 @@ export function App({ siteKey, apiBase }: Props) {
   const [showLead, setShowLead] = useState(false);
   const [leadDone, setLeadDone] = useState(false);
   const [teaser, setTeaser] = useState<string | null>(null);
+  const [openerId, setOpenerId] = useState<string | null>(null);
   const [human, setHuman] = useState(false);
   const [convId, setConvId] = useState<string | undefined>(undefined);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const openRef = useRef(false);
+  const teaserRef = useRef<string | null>(null);
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+  useEffect(() => {
+    teaserRef.current = teaser;
+  }, [teaser]);
 
   // Config laden + Outreach starten
   useEffect(() => {
@@ -80,6 +89,30 @@ export function App({ siteKey, apiBase }: Props) {
     return () => cleanupOutreach();
   }, [siteKey]);
 
+  // Seitenspezifischer Gesprächseinstieg: einen passenden Opener holen und nach
+  // kurzer Verzögerung als Sprechblase über dem geschlossenen Chat zeigen (A/B).
+  useEffect(() => {
+    if (!config) return;
+    let cancelled = false;
+    let timer = 0;
+    api.current
+      .getOpener(window.location.pathname || '/')
+      .then((op) => {
+        if (cancelled || !op) return;
+        timer = window.setTimeout(() => {
+          if (!openRef.current && teaserRef.current == null) {
+            setTeaser(op.text);
+            setOpenerId(op.id);
+          }
+        }, 5000);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [config]);
+
   // Auto-scroll
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -109,6 +142,11 @@ export function App({ siteKey, apiBase }: Props) {
 
   function openPanel() {
     setOpen(true);
+    // Engagement zählen, wenn der Chat aus einem KI-Gesprächseinstieg geöffnet wird.
+    if (openerId) {
+      void api.current.openerEngage(openerId);
+      setOpenerId(null);
+    }
     if (teaser) {
       setMessages((m) => [...m, { role: 'bot', text: teaser }]);
       setTeaser(null);

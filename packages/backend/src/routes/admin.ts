@@ -17,6 +17,7 @@ import { listLeads } from '../services/lead.js';
 import { suggestGapAnswer } from '../services/gapsuggest.js';
 import { testKnowledge } from '../services/kbsearch.js';
 import { kbDiagnostics, purgeKb, clearCache } from '../services/diagnostics.js';
+import { addManualOpener, deleteOpener, listOpeners, updateOpener } from '../services/outreach.js';
 import { getTranscript, listConversations } from '../services/conversation.js';
 import { getSessionUser } from './auth.js';
 import {
@@ -240,6 +241,56 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         reply.code(422);
         return { error: 'search_failed', message: (err as Error).message };
       }
+    });
+  });
+
+  // ── Gesprächseinstiege (seitenspezifisch, A/B + Statistik) ──
+  app.get<{ Params: { siteKey: string } }>('/:siteKey/openers', async (req, reply) => {
+    const t = await tenantOr404(req.params.siteKey, reply);
+    if (!t) return;
+    return inTenant(t, reply, async () => ({ openers: await listOpeners(t.id) }));
+  });
+
+  const openerSchema = z.object({
+    pageMatch: z.string().max(512).optional(),
+    text: z.string().min(3).max(300),
+  });
+  app.post<{ Params: { siteKey: string } }>('/:siteKey/openers', async (req, reply) => {
+    const t = await tenantOr404(req.params.siteKey, reply);
+    if (!t) return;
+    const body = openerSchema.parse(req.body);
+    return inTenant(t, reply, async () => ({ opener: await addManualOpener(t.id, body.pageMatch ?? '/', body.text) }));
+  });
+
+  const openerPatchSchema = z.object({
+    active: z.boolean().optional(),
+    text: z.string().min(3).max(300).optional(),
+    pageMatch: z.string().max(512).optional(),
+  });
+  app.patch<{ Params: { siteKey: string; id: string } }>('/:siteKey/openers/:id', async (req, reply) => {
+    const t = await tenantOr404(req.params.siteKey, reply);
+    if (!t) return;
+    const patch = openerPatchSchema.parse(req.body ?? {});
+    return inTenant(t, reply, async () => {
+      const ok = await updateOpener(t.id, req.params.id, patch);
+      if (!ok) {
+        reply.code(404);
+        return { error: 'not_found', message: 'Einstieg nicht gefunden.' };
+      }
+      return { ok: true };
+    });
+  });
+
+  app.delete<{ Params: { siteKey: string; id: string } }>('/:siteKey/openers/:id', async (req, reply) => {
+    const t = await tenantOr404(req.params.siteKey, reply);
+    if (!t) return;
+    return inTenant(t, reply, async () => {
+      const ok = await deleteOpener(t.id, req.params.id);
+      if (!ok) {
+        reply.code(404);
+        return { error: 'not_found', message: 'Einstieg nicht gefunden.' };
+      }
+      return { deleted: true };
     });
   });
 

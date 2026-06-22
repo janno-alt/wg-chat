@@ -6,6 +6,10 @@ import { getProviderForTenant, hasEmbeddings, type TenantLlmCfg } from '../llm/i
 import { recordUsage } from './usage.js';
 import { chunkText } from './chunking.js';
 import { crawlSite, fetchPage } from './crawler.js';
+import { generateOpenersForPage, toPath } from './outreach.js';
+
+/** Obergrenze für KI-Gesprächseinstiege pro Crawl (Kostenbremse). */
+const MAX_OPENER_PAGES = 40;
 
 export interface IngestResult {
   documentId: string;
@@ -214,6 +218,11 @@ export async function crawlAndIngest(
       if (!errors.includes(res.error)) errors.push(res.error);
     }
     documents.push({ url: p.url, ...res });
+
+    // KI-Gesprächseinstiege passend zur Seite erzeugen (gekappt, Fehler werden geschluckt).
+    if (res.embedded && embedded <= MAX_OPENER_PAGES) {
+      await generateOpenersForPage(tenantId, toPath(p.url), p.title ?? null, p.text, llmCfg);
+    }
   }
 
   if (pages.length === 0) {

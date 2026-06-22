@@ -81,6 +81,19 @@ CREATE TABLE IF NOT EXISTS ${s}.llm_usage (
 );
 CREATE INDEX IF NOT EXISTS llm_usage_created_idx ON ${s}.llm_usage(created_at);
 
+CREATE TABLE IF NOT EXISTS ${s}.outreach_openers (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id uuid NOT NULL,
+  page_match text NOT NULL DEFAULT '/',
+  text text NOT NULL,
+  active boolean NOT NULL DEFAULT true,
+  source varchar(8) NOT NULL DEFAULT 'ai',
+  impressions integer NOT NULL DEFAULT 0,
+  engagements integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS outreach_openers_tenant_idx ON ${s}.outreach_openers(tenant_id);
+
 CREATE TABLE IF NOT EXISTS ${s}.knowledge_gaps (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL,
@@ -111,10 +124,23 @@ export async function provisionSchema(schema: string): Promise<void> {
   await getPool().query(schemaDDL(schema));
 }
 
-/** Idempotente Spalten-Upgrades für bereits existierende Tenant-Schemas. */
+/** Idempotente Spalten-/Tabellen-Upgrades für bereits existierende Tenant-Schemas. */
 export async function ensureSchemaUpgrades(schema: string): Promise<void> {
   if (!isValidSchema(schema)) throw new Error(`Ungültiger Schema-Name: ${schema}`);
-  await getPool().query(
-    `ALTER TABLE "${schema}".kb_documents ADD COLUMN IF NOT EXISTS ingest_error text;`,
-  );
+  const s = `"${schema}"`;
+  await getPool().query(`ALTER TABLE ${s}.kb_documents ADD COLUMN IF NOT EXISTS ingest_error text;`);
+  await getPool().query(`
+    CREATE TABLE IF NOT EXISTS ${s}.outreach_openers (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      tenant_id uuid NOT NULL,
+      page_match text NOT NULL DEFAULT '/',
+      text text NOT NULL,
+      active boolean NOT NULL DEFAULT true,
+      source varchar(8) NOT NULL DEFAULT 'ai',
+      impressions integer NOT NULL DEFAULT 0,
+      engagements integer NOT NULL DEFAULT 0,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS outreach_openers_tenant_idx ON ${s}.outreach_openers(tenant_id);
+  `);
 }
