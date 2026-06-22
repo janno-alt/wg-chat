@@ -37,9 +37,11 @@ export function Openers({ api, siteKey }: { api: Api; siteKey: string }) {
     <div className="space-y-5">
       <Card title="Neuer Gesprächseinstieg (manuell)">
         <p className="mb-2 text-xs text-slate-500">
-          Einstiege werden beim Crawlen automatisch je Seite von der KI vorgeschlagen. Hier kannst du
-          eigene ergänzen. Seite = Pfad-Prefix (z. B. <code>/leistungen/wartung</code>, <code>/</code> = überall).
-          Mehrere Einstiege pro Seite werden im Widget gleichmäßig ausgespielt (A/B).
+          Einstiege werden beim Crawlen automatisch je Seite von der KI vorgeschlagen (verkaufsorientiert,
+          als offene Frage). Hier kannst du eigene ergänzen – nur die Frage selbst, <strong>ohne „Hallo"</strong>:
+          eine tageszeitabhängige Begrüßung (nach 17 Uhr lockerer) wird automatisch vorangestellt, und der
+          Einstieg wird die erste Nachricht im Chat. Seite = Pfad-Prefix (z. B. <code>/leistungen/wartung</code>,
+          <code>/</code> = überall). Mehrere pro Seite werden gleichmäßig ausgespielt (A/B).
         </p>
         <div className="grid gap-2 sm:grid-cols-[200px_1fr_auto] sm:items-end">
           <Field label="Seite (Pfad)">

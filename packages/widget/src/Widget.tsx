@@ -45,6 +45,7 @@ export function App({ siteKey, apiBase }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const openRef = useRef(false);
   const teaserRef = useRef<string | null>(null);
+  const engagedRef = useRef(false);
   useEffect(() => {
     openRef.current = open;
   }, [open]);
@@ -89,8 +90,9 @@ export function App({ siteKey, apiBase }: Props) {
     return () => cleanupOutreach();
   }, [siteKey]);
 
-  // Seitenspezifischer Gesprächseinstieg: einen passenden Opener holen und nach
-  // kurzer Verzögerung als Sprechblase über dem geschlossenen Chat zeigen (A/B).
+  // Seitenspezifischer Gesprächseinstieg: passenden Opener holen. Er wird die ERSTE
+  // Chat-Nachricht (ersetzt die generische Begrüßung) UND erscheint nach kurzer Zeit
+  // als Sprechblase über dem geschlossenen Chat (A/B + Tageszeit-Begrüßung vom Server).
   useEffect(() => {
     if (!config) return;
     let cancelled = false;
@@ -99,12 +101,12 @@ export function App({ siteKey, apiBase }: Props) {
       .getOpener(window.location.pathname || '/')
       .then((op) => {
         if (cancelled || !op) return;
+        setOpenerId(op.id);
+        // Opener als erste Nachricht setzen, solange nur die Begrüßung dasteht.
+        setMessages((prev) => (prev.length === 1 && prev[0]!.role === 'bot' ? [{ role: 'bot', text: op.text }] : prev));
         timer = window.setTimeout(() => {
-          if (!openRef.current && teaserRef.current == null) {
-            setTeaser(op.text);
-            setOpenerId(op.id);
-          }
-        }, 5000);
+          if (!openRef.current && teaserRef.current == null) setTeaser(op.text);
+        }, 4000);
       })
       .catch(() => {});
     return () => {
@@ -142,13 +144,14 @@ export function App({ siteKey, apiBase }: Props) {
 
   function openPanel() {
     setOpen(true);
-    // Engagement zählen, wenn der Chat aus einem KI-Gesprächseinstieg geöffnet wird.
-    if (openerId) {
+    // Engagement (einmalig) zählen, wenn der Chat aus dem KI-Gesprächseinstieg geöffnet wird.
+    if (openerId && !engagedRef.current) {
+      engagedRef.current = true;
       void api.current.openerEngage(openerId);
-      setOpenerId(null);
     }
+    // Opener ist bereits die erste Nachricht → nur Verhaltens-Teaser (ohne openerId) anhängen.
     if (teaser) {
-      setMessages((m) => [...m, { role: 'bot', text: teaser }]);
+      if (!openerId) setMessages((m) => [...m, { role: 'bot', text: teaser }]);
       setTeaser(null);
     }
   }
