@@ -56,7 +56,11 @@ export const STYLES = /* css */ `
 .kc-msg { max-width: 85%; padding:10px 13px; border-radius:14px; font-size:14px; line-height:1.45; white-space:pre-wrap; word-wrap:break-word; }
 .kc-msg.kc-bot { background:#fff; color:#111; align-self:flex-start; border:1px solid #ececf0; border-bottom-left-radius:4px; }
 .kc-msg.kc-user { background:var(--kc-primary); color:var(--kc-on-primary); align-self:flex-end; border-bottom-right-radius:4px; }
-.kc-typing { font-size:13px; color:#888; align-self:flex-start; }
+.kc-typing { align-self:flex-start; background:#fff; border:1px solid #ececf0; border-radius:14px; border-bottom-left-radius:4px; padding:13px 14px; display:flex; gap:4px; }
+.kc-typing span { width:7px; height:7px; border-radius:50%; background:#bcbcc6; display:inline-block; animation: kc-blink 1.2s infinite ease-in-out both; }
+.kc-typing span:nth-child(2){ animation-delay:.18s; }
+.kc-typing span:nth-child(3){ animation-delay:.36s; }
+@keyframes kc-blink { 0%,80%,100%{ transform:scale(.6); opacity:.35; } 40%{ transform:scale(1); opacity:1; } }
 
 .kc-quick { display:flex; flex-wrap:wrap; gap:8px; padding:0 14px 8px; background:var(--kc-bg); }
 .kc-quick button {

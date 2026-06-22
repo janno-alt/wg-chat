@@ -113,21 +113,38 @@ function cleanContext(s: string): string {
   return s.replace(/\s+/g, ' ').trim().slice(0, 1500);
 }
 
+/** Macht LLM-Text menschlicher: entfernt KI-typische Gedankenstriche (—/–). */
+function humanize(text: string): string {
+  return text
+    .replace(/\s*—\s*/g, ', ') // Geviertstrich → Komma
+    .replace(/(\d)\s*–\s*(\d)/g, '$1-$2') // Zahlbereich: Halbgeviert → Bindestrich
+    .replace(/\s*–\s*/g, ', ') // sonstiger Halbgeviertstrich → Komma
+    .replace(/\s+,/g, ',')
+    .replace(/,\s*,/g, ',')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function buildSystemPrompt(tenantName: string, context: string): string {
   return (
     `Du bist der Kundenberater von "${tenantName}". Antworte natürlich und hilfreich in 2–3 Sätzen ` +
     `– nicht länger, aber auch nicht nur ein knapper Halbsatz.\n` +
     `Regeln:\n` +
     `- Konkrete Fakten (Preise, Zahlen, Leistungen, Pakete) NUR, wenn sie wörtlich im Kontext stehen. ` +
-    `Erfinde nichts, nenne keine Beispiele, Branchen oder Anwendungsfälle, die nicht im Kontext stehen, ` +
-    `und vermische verschiedene Angebote nicht (z. B. einmalige Leistung ≠ monatliche Wartung).\n` +
+    `Erfinde nichts, nenne keine Beispiele, Branchen oder Anwendungsfälle, die nicht im Kontext stehen.\n` +
+    `- Trenne Angebotsarten strikt: einmalige Leistungen (z. B. Website-Erstellung) sind etwas ANDERES ` +
+    `als laufende/monatliche Kosten (z. B. Wartung, Hosting, Support). Stelle ein monatliches Paket ` +
+    `NIEMALS als Preis für die Erstellung dar und vermische die beiden nicht. Bist du unsicher, welcher ` +
+    `Preis zu welchem Angebot gehört, nenne ihn lieber gar nicht.\n` +
     `- Du darfst ohne neue Fakten allgemein ergänzen, dass der genaue Preis bzw. Umfang von den ` +
     `individuellen Anforderungen abhängt.\n` +
-    `- Schließe – wenn es zur Frage passt – mit einer kurzen, freundlichen Einladung, für ein konkretes ` +
+    `- Schließe, wenn es zur Frage passt, mit einer kurzen, freundlichen Einladung, für ein konkretes ` +
     `Angebot oder Details eine Anfrage zu stellen. Dezent, nicht werblich oder aufdringlich.\n` +
+    `- Schreibe menschlich und natürlich. Verwende KEINE Gedankenstriche (— oder –); nutze stattdessen ` +
+    `Kommas, Punkte oder Klammern.\n` +
     `- Gib niemals HTML, Code oder rohe Seitenfragmente aus.\n` +
     `- Steht gar keine passende Information im Kontext, sage in einem Satz, dass du das ans Team ` +
-    `weiterleitest – ohne Details zu erfinden.\n\n` +
+    `weiterleitest, ohne Details zu erfinden.\n\n` +
     `Kontext:\n${context}`
   );
 }
@@ -191,7 +208,7 @@ export async function answerFromHits(
         purpose: 'generate',
         usage: gen.usage,
       });
-      const reply = gen.text.trim();
+      const reply = humanize(gen.text.trim());
       if (reply) {
         log(`rag generated sim=${top.similarity.toFixed(3)}`);
         return { reply, source: 'llm' };

@@ -122,6 +122,10 @@ export function App({ siteKey, apiBase }: Props) {
     setQuick([]);
     setMessages((m) => [...m, { role: 'user', text: trimmed }]);
     setSending(true);
+    // Menschlich wirkende Mindest-Tippzeit: auch bei sofortiger Antwort sieht der
+    // Nutzer ~2–3 s das Schreibzeichen, statt eine Instant-Antwort zu bekommen.
+    const startedAt = Date.now();
+    const minTypingMs = 2000 + Math.floor(Math.random() * 900);
     try {
       const res = await api.current.chat({
         sessionId: sessionId.current,
@@ -129,6 +133,8 @@ export function App({ siteKey, apiBase }: Props) {
         message: trimmed,
         pageUrl: window.location.href,
       });
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < minTypingMs) await new Promise((r) => setTimeout(r, minTypingMs - elapsed));
       conversationId.current = res.conversationId;
       if (!convId) setConvId(res.conversationId);
       if (res.reply) setMessages((m) => [...m, { role: 'bot', text: res.reply }]);
@@ -237,7 +243,13 @@ export function App({ siteKey, apiBase }: Props) {
                 {m.text}
               </div>
             ))}
-            {sending && <div class="kc-typing">…</div>}
+            {sending && (
+              <div class="kc-typing" aria-label="schreibt">
+                <span />
+                <span />
+                <span />
+              </div>
+            )}
           </div>
 
           {quick.length > 0 && !showLead && (
