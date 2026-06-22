@@ -85,10 +85,12 @@ export async function runCascade(
     // ── Stufe 4: KB-Retrieval ──
     const hits = await searchChunks(t.id, embedding, 4);
     const top = hits[0];
-    if (top && top.similarity >= th.direct) {
-      // sehr hohe Ähnlichkeit → hinterlegte/kanonische Antwort direkt, ohne Generierung
-      const answer = top.canonicalAnswer?.trim() || top.content.trim();
-      log(`retrieval-direct sim=${top.similarity.toFixed(3)}`);
+
+    // 4a) Nur eine KURATIERTE Antwort (FAQ canonicalAnswer) darf bei hoher Ähnlichkeit
+    // direkt raus. Gecrawlte Seiteninhalte werden NIE roh zitiert (sonst HTML-/Textauswurf).
+    if (top && top.canonicalAnswer?.trim() && top.similarity >= th.direct) {
+      const answer = top.canonicalAnswer.trim();
+      log(`retrieval-direct (canonical) sim=${top.similarity.toFixed(3)}`);
       await addBotMessage({
         conversationId: conv.id,
         content: answer,
@@ -98,7 +100,8 @@ export async function runCascade(
       return { conversationId: conv.id, reply: answer, source: 'retrieval' };
     }
 
-    // ── Stufe 5: RAG-Generierung (nur bei mittlerer Konfidenz UND innerhalb Budget) ──
+    // ── Stufe 5: RAG-Generierung – Seiteninhalte werden vom LLM zu einer eigenständigen,
+    // freundlichen Antwort zusammengefasst (nie wörtlich zitiert), innerhalb Budget. ──
     if (top && top.similarity >= th.rag) {
       const within = await canGenerate(t.monthlyBudgetEur);
       if (!within) {
@@ -106,7 +109,7 @@ export async function runCascade(
       } else {
         const context = hits
           .filter((h) => h.similarity >= th.rag)
-          .map((h, i) => `[${i + 1}] ${h.content}`)
+          .map((h, i) => `[${i + 1}] ${cleanContext(h.content)}`)
           .join('\n\n');
         try {
           const gen = await provider.generate(
@@ -114,10 +117,12 @@ export async function runCascade(
               {
                 role: 'system',
                 content:
-                  `Du bist der Assistent von "${t.name}". Antworte kurz, freundlich und ` +
-                  `AUSSCHLIESSLICH auf Basis des folgenden Kontexts. Wenn die Antwort nicht ` +
-                  `eindeutig im Kontext steht, sage höflich, dass du das ans Team weiterleitest. ` +
-                  `Erfinde nichts.\n\nKontext:\n${context}`,
+                  `Du bist der freundliche Kundenberater von "${t.name}". Beantworte die Frage in ` +
+                  `eigenen Worten, natürlich und knapp (2–4 Sätze), so wie ein Mitarbeiter es mündlich ` +
+                  `sagen würde. Stütze dich AUSSCHLIESSLICH auf den Kontext und fasse zusammen, statt zu ` +
+                  `zitieren. Gib NIEMALS HTML, Code, Menüpunkte oder rohe Textfragmente aus. Steht die ` +
+                  `Antwort nicht klar im Kontext, sage höflich, dass du das ans Team weiterleitest – ` +
+                  `erfinde nichts.\n\nKontext:\n${context}`,
               },
               { role: 'user', content: req.message },
             ],
@@ -159,6 +164,11 @@ export async function runCascade(
     { label: 'Mit Mensch sprechen', value: '__handoff__' },
   ];
   return { conversationId: conv.id, reply, source: 'escalation', escalate: true, quickReplies };
+}
+
+/** Chunk-Text für den LLM-Kontext säubern: Whitespace normalisieren, Länge kappen. */
+function cleanContext(s: string): string {
+  return s.replace(/\s+/g, ' ').trim().slice(0, 1500);
 }
 
 /** Unbeantwortete Frage als Wissenslücke protokollieren (Häufigkeit hochzählen). */

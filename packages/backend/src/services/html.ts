@@ -8,19 +8,35 @@ export interface ExtractedPage {
   text: string;
 }
 
+// Tag-Erkennung, die `>` INNERHALB von Attribut-Anführungszeichen überspringt –
+// nötig für Elementor/WordPress, die JSON (mit `>`) in data-Attribute schreiben.
+const TAG_RE = /<[a-zA-Z!/][^>"']*(?:"[^"]*"[^>"']*|'[^']*'[^>"']*)*>/g;
+
 export function extractText(html: string): ExtractedPage {
-  const stripped = html
+  const noScript = html
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
     .replace(/<!--[\s\S]*?-->/g, ' ');
 
-  const titleMatch = stripped.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  // Titel aus <head> holen, BEVOR der Kopfbereich entfernt wird.
+  const titleMatch = noScript.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   const title = titleMatch ? decodeEntities(titleMatch[1]!).replace(/\s+/g, ' ').trim() : null;
 
-  // Block-Elemente in Zeilenumbrüche wandeln, damit Wörter nicht verkleben
-  const withBreaks = stripped.replace(/<\/(p|div|li|h[1-6]|section|article|br|tr)>/gi, '\n');
-  const text = decodeEntities(withBreaks.replace(/<[^>]+>/g, ' '))
+  // Nicht-Inhalt entfernen (Kopf, SVG-Pfade, eingebettete iframes/Formulare),
+  // dann Block-Elemente in Zeilenumbrüche wandeln, damit Wörter nicht verkleben.
+  const body = noScript
+    .replace(/<head[\s\S]*?<\/head>/gi, ' ')
+    .replace(/<svg[\s\S]*?<\/svg>/gi, ' ')
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, ' ')
+    .replace(/<form[\s\S]*?<\/form>/gi, ' ')
+    .replace(/<\/(p|div|li|h[1-6]|section|article|tr|td|th|blockquote)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n');
+
+  // Tags strippen → Entities dekodieren → erneut strippen (entfernt als Text
+  // maskiertes HTML wie &lt;div&gt;, das sonst im Wissens-Chunk landen würde).
+  const text = decodeEntities(body.replace(TAG_RE, ' '))
+    .replace(TAG_RE, ' ')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .replace(/^\s+|\s+$/gm, '')
