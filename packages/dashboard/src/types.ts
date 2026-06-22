@@ -53,6 +53,7 @@ export interface PurgeResult {
   schemaDocs: number;
   publicChunks: number;
   publicDocs: number;
+  conversations: number;
 }
 
 export interface SearchHit {

@@ -99,7 +99,8 @@ export function KnowledgeBase({ api, siteKey }: { api: Api; siteKey: string }) {
       const { purged } = await api.purgeKb(siteKey);
       alert(
         `Geleert: ${purged.schemaDocs} Dokument(e) + ${purged.schemaChunks} Chunk(s) im Kunden-Schema, ` +
-          `${purged.publicDocs} + ${purged.publicChunks} aus public (Altlast).`,
+          `${purged.publicDocs} + ${purged.publicChunks} aus public (Altlast), ` +
+          `${purged.conversations} Konversation(en) (Cache zurückgesetzt). Leads bleiben erhalten.`,
       );
       setDiag(null);
       reload();

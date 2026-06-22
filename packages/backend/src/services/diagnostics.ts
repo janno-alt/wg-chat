@@ -49,32 +49,47 @@ export interface PurgeResult {
   schemaDocs: number;
   publicChunks: number;
   publicDocs: number;
+  /** geleerte Konversationen = semantischer Cache (alte, evtl. rohe Antworten). */
+  conversations: number;
+}
+
+async function tableExists(qualified: string): Promise<boolean> {
+  return Boolean(await getPool().query('select to_regclass($1) as r', [qualified]).then((r) => r.rows[0]?.r));
 }
 
 /**
  * Löscht ALLE Wissensbasis-Daten eines Kunden – im Kunden-Schema (komplett) und die
- * Alt-Daten im public-Schema (auf diesen Tenant beschränkt). Für einen sauberen
- * Neustart nach inkonsistenten Crawls. Chunks zuerst (deckt auch verwaiste ab).
+ * Alt-Daten im public-Schema (auf diesen Tenant beschränkt). Leert AUSSERDEM die
+ * Konversationen (= semantischer Cache), damit keine alten, vor dem Fix gespeicherten
+ * Roh-Antworten mehr ausgeliefert werden. Leads bleiben erhalten.
  */
 export async function purgeKb(schemaName: string | null, tenantId: string): Promise<PurgeResult> {
   const pool = getPool();
-  const res: PurgeResult = { schemaChunks: 0, schemaDocs: 0, publicChunks: 0, publicDocs: 0 };
+  const res: PurgeResult = { schemaChunks: 0, schemaDocs: 0, publicChunks: 0, publicDocs: 0, conversations: 0 };
 
   if (schemaName && isValidSchema(schemaName)) {
     const s = `"${schemaName}"`;
-    if (await pool.query('select to_regclass($1) as r', [`${schemaName}.kb_chunks`]).then((r) => r.rows[0]?.r)) {
+    if (await tableExists(`${schemaName}.kb_chunks`)) {
       res.schemaChunks = (await pool.query(`delete from ${s}.kb_chunks`)).rowCount ?? 0;
     }
-    if (await pool.query('select to_regclass($1) as r', [`${schemaName}.kb_documents`]).then((r) => r.rows[0]?.r)) {
+    if (await tableExists(`${schemaName}.kb_documents`)) {
       res.schemaDocs = (await pool.query(`delete from ${s}.kb_documents`)).rowCount ?? 0;
+    }
+    // Konversationen leeren → messages werden per FK-Cascade entfernt (Cache-Reset).
+    if (await tableExists(`${schemaName}.conversations`)) {
+      res.conversations = (await pool.query(`delete from ${s}.conversations`)).rowCount ?? 0;
     }
   }
 
-  if (await pool.query("select to_regclass('public.kb_chunks') as r").then((r) => r.rows[0]?.r)) {
+  if (await tableExists('public.kb_chunks')) {
     res.publicChunks = (await pool.query('delete from public.kb_chunks where tenant_id = $1', [tenantId])).rowCount ?? 0;
   }
-  if (await pool.query("select to_regclass('public.kb_documents') as r").then((r) => r.rows[0]?.r)) {
+  if (await tableExists('public.kb_documents')) {
     res.publicDocs = (await pool.query('delete from public.kb_documents where tenant_id = $1', [tenantId])).rowCount ?? 0;
+  }
+  if (await tableExists('public.conversations')) {
+    res.conversations +=
+      (await pool.query('delete from public.conversations where tenant_id = $1', [tenantId])).rowCount ?? 0;
   }
   return res;
 }

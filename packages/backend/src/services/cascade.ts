@@ -83,7 +83,7 @@ export async function runCascade(
     }
 
     // ── Stufe 4+5: Retrieval → kuratierte Antwort ODER LLM-Zusammenfassung ──
-    const hits = await searchChunks(t.id, embedding, 4);
+    const hits = await searchChunks(t.id, embedding, 6);
     const ans = await answerFromHits(t, req.message, hits, th, provider, conv.id, log);
     if (ans) {
       await addBotMessage({
@@ -115,12 +115,14 @@ function cleanContext(s: string): string {
 
 function buildSystemPrompt(tenantName: string, context: string): string {
   return (
-    `Du bist der freundliche Kundenberater von "${tenantName}". Beantworte die Frage in ` +
-    `eigenen Worten, natürlich und knapp (2–4 Sätze), so wie ein Mitarbeiter es mündlich sagen ` +
-    `würde. Stütze dich AUSSCHLIESSLICH auf den Kontext und fasse zusammen, statt zu zitieren. ` +
-    `Gib NIEMALS HTML, Code, Menüpunkte oder rohe Textfragmente aus. Steht die Antwort nicht klar ` +
-    `im Kontext, sage höflich, dass du das ans Team weiterleitest – erfinde nichts.\n\n` +
-    `Kontext:\n${context}`
+    `Du bist der freundliche, kompetente Kundenberater von "${tenantName}". Beantworte die Frage ` +
+    `in eigenen Worten, natürlich und hilfreich – wie ein gut informierter Mitarbeiter im Gespräch. ` +
+    `Sei fundiert: nimm ALLE relevanten Details aus dem Kontext zusammen (Leistungen, Ablauf, Preise, ` +
+    `Vorteile, nächste Schritte) und erkläre sie verständlich in 3–6 Sätzen statt nur knapp. ` +
+    `Stütze dich AUSSCHLIESSLICH auf den Kontext und fasse zusammen, statt zu zitieren. Gib NIEMALS ` +
+    `HTML, Code, Menüpunkte oder rohe Textfragmente aus. Wenn sinnvoll, schließe mit einem konkreten ` +
+    `nächsten Schritt (z. B. Kontakt/Angebot). Steht die Antwort nicht im Kontext, sage höflich, dass ` +
+    `du das ans Team weiterleitest – erfinde nichts.\n\nKontext:\n${context}`
   );
 }
 
@@ -163,7 +165,7 @@ export async function answerFromHits(
     }
     const context = hits
       .filter((h) => h.similarity >= th.rag)
-      .slice(0, 4)
+      .slice(0, 6)
       .map((h, i) => `[${i + 1}] ${cleanContext(h.content)}`)
       .join('\n\n');
     if (!context) return null;
@@ -173,7 +175,7 @@ export async function answerFromHits(
           { role: 'system', content: buildSystemPrompt(t.name, context) },
           { role: 'user', content: question },
         ],
-        { temperature: 0.2, maxTokens: 400 },
+        { temperature: 0.3, maxTokens: 700 },
       );
       await recordUsage({
         tenantId: t.id,
