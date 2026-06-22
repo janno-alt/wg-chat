@@ -17,7 +17,7 @@ export const STYLES = /* css */ `
 .kc-launcher {
   width: 60px; height: 60px; border-radius: 50%;
   background: var(--kc-bubble); color: var(--kc-on-primary);
-  border: none; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  border: none; padding: 0; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.25);
   display: flex; align-items: center; justify-content: center;
   font-size: 26px; transition: transform .15s ease;
 }
