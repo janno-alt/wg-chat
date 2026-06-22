@@ -132,9 +132,6 @@ export function KnowledgeBase({ api, siteKey }: { api: Api; siteKey: string }) {
     }
   }
 
-  const topSim = result?.hits[0]?.similarity ?? 0;
-  const wouldAnswer = result ? topSim >= result.thresholds.rag : false;
-
   return (
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-3">
@@ -175,36 +172,46 @@ export function KnowledgeBase({ api, siteKey }: { api: Api; siteKey: string }) {
 
       <Card title="Wissen testen">
         <p className="mb-2 text-xs text-slate-500">
-          Tippe eine Beispielfrage – du siehst, welche Inhalte der Bot findet und mit welchem Score. So erkennst du,
-          warum er ggf. eskaliert (kein Treffer über der RAG-Schwelle).
+          Tippe eine echte Kundenfrage – du siehst die <strong>tatsächliche Antwort des Bots</strong> (inkl. KI-Formulierung),
+          plus darunter die Belege aus der Wissensbasis mit Score.
         </p>
         <div className="flex gap-2">
           <Input value={testQuery} placeholder="z. B. Was kostet eine Website?" onChange={(e) => setTestQuery(e.currentTarget.value)} onKeyDown={(e) => e.key === 'Enter' && testKnowledge()} />
-          <Button onClick={testKnowledge} disabled={searching || !testQuery.trim()}>{searching ? 'Suche …' : 'Testen'}</Button>
+          <Button onClick={testKnowledge} disabled={searching || !testQuery.trim()}>{searching ? 'Antwortet …' : 'Testen'}</Button>
         </div>
         {searchErr && <div className="mt-2"><ErrorNote error={searchErr} /></div>}
         {result && (
-          <div className="mt-3 space-y-2">
-            <div className={`rounded-md px-3 py-2 text-sm ${wouldAnswer ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-800'}`}>
-              {result.hits.length === 0
-                ? 'Keine Treffer – die Wissensbasis hat dazu nichts (oder es fehlen Embeddings). Der Bot eskaliert.'
-                : wouldAnswer
-                  ? `Bester Treffer ${(topSim * 100).toFixed(0)} % ≥ RAG-Schwelle (${(result.thresholds.rag * 100).toFixed(0)} %) → der Bot antwortet.`
-                  : `Bester Treffer nur ${(topSim * 100).toFixed(0)} % < RAG-Schwelle (${(result.thresholds.rag * 100).toFixed(0)} %) → der Bot eskaliert. Mehr/passenderes Wissen einpflegen oder Schwelle senken.`}
+          <div className="mt-3 space-y-3">
+            <div className="rounded-lg border border-slate-200 p-3">
+              <div className="mb-1 flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Antwort des Bots</span>
+                <Badge tone={result.answer.source === 'llm' ? 'green' : result.answer.source === 'retrieval' ? 'blue' : 'amber'}>
+                  {result.answer.source === 'llm' ? 'KI-formuliert' : result.answer.source === 'retrieval' ? 'FAQ direkt' : 'Eskalation (kein Treffer)'}
+                </Badge>
+              </div>
+              <div className="whitespace-pre-wrap text-sm text-slate-800">{result.answer.reply}</div>
             </div>
-            {result.hits.map((h) => {
-              const pct = Math.round(h.similarity * 100);
-              const tone = h.similarity >= result.thresholds.direct ? 'green' : h.similarity >= result.thresholds.rag ? 'blue' : 'amber';
-              return (
-                <div key={h.chunkId} className="rounded-lg border border-slate-100 p-2">
-                  <div className="mb-1 flex items-center gap-2">
-                    <Badge tone={tone}>{pct} %</Badge>
-                    <span className="truncate text-xs text-slate-500">{h.title || h.sourceUrl || '—'}</span>
-                  </div>
-                  <div className="line-clamp-3 text-sm text-slate-700">{h.content}</div>
+
+            {result.hits.length > 0 && (
+              <details>
+                <summary className="cursor-pointer text-xs text-slate-500">Belege / Fundstellen ({result.hits.length})</summary>
+                <div className="mt-2 space-y-2">
+                  {result.hits.map((h) => {
+                    const pct = Math.round(h.similarity * 100);
+                    const tone = h.similarity >= result.thresholds.direct ? 'green' : h.similarity >= result.thresholds.rag ? 'blue' : 'amber';
+                    return (
+                      <div key={h.chunkId} className="rounded-lg border border-slate-100 p-2">
+                        <div className="mb-1 flex items-center gap-2">
+                          <Badge tone={tone}>{pct} %</Badge>
+                          <span className="truncate text-xs text-slate-500">{h.title || h.sourceUrl || '—'}</span>
+                        </div>
+                        <div className="line-clamp-3 text-sm text-slate-700">{h.content}</div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </details>
+            )}
           </div>
         )}
       </Card>

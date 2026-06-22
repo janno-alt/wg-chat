@@ -7,7 +7,6 @@ import { getConfig } from '../config.js';
 import {
   createTenant,
   listTenants,
-  resolveThresholds,
   resolveTenantBySiteKey,
   updateTenant,
   updateTenantSettings,
@@ -16,7 +15,7 @@ import {
 import { getUsageSummary } from '../services/usage.js';
 import { listLeads } from '../services/lead.js';
 import { suggestGapAnswer } from '../services/gapsuggest.js';
-import { searchKnowledge } from '../services/kbsearch.js';
+import { testKnowledge } from '../services/kbsearch.js';
 import { kbDiagnostics, purgeKb } from '../services/diagnostics.js';
 import { getTranscript, listConversations } from '../services/conversation.js';
 import { getSessionUser } from './auth.js';
@@ -229,9 +228,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const { query } = z.object({ query: z.string().min(1).max(2000) }).parse(req.body);
     return inTenant(t, reply, async () => {
       try {
-        const hits = await searchKnowledge(t.id, query, t.llmProviderCfg);
-        const th = resolveThresholds(t);
-        return { hits, thresholds: { direct: th.direct, rag: th.rag } };
+        return await testKnowledge(t, query);
       } catch (err) {
         reply.code(422);
         return { error: 'search_failed', message: (err as Error).message };

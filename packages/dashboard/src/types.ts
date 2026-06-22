@@ -68,6 +68,7 @@ export interface SearchHit {
 export interface SearchResult {
   hits: SearchHit[];
   thresholds: { direct: number; rag: number };
+  answer: { reply: string; source: 'retrieval' | 'llm' | 'escalation' };
 }
 
 export interface UsageRow {
