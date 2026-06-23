@@ -47,6 +47,33 @@ export async function runCascade(
 
   const th = resolveThresholds(t);
 
+  // ── Hoch-Intent: Terminwunsch / Kontaktwunsch (0 LLM) ──
+  const intent = detectIntent(req.message);
+  if (intent === 'booking') {
+    if (t.settings.bookingUrl) {
+      const reply = 'Sehr gern! Du kannst direkt hier einen passenden Termin auswählen:';
+      await addBotMessage({ conversationId: conv.id, content: reply, source: 'rule' });
+      return { conversationId: conv.id, reply, source: 'rule', booking: t.settings.bookingUrl };
+    }
+    const reply = 'Sehr gern! Lass mir kurz deine Kontaktdaten da, dann stimmen wir einen Termin ab.';
+    await addBotMessage({ conversationId: conv.id, content: reply, source: 'rule' });
+    return {
+      conversationId: conv.id,
+      reply,
+      source: 'rule',
+      escalate: true,
+      quickReplies: [
+        { label: 'Kontaktdaten hinterlassen', value: '__lead__' },
+        { label: 'Mit Mensch sprechen', value: '__handoff__' },
+      ],
+    };
+  }
+  if (intent === 'lead') {
+    const reply = 'Gerne! Hinterlasse mir kurz deine Kontaktdaten, dann kümmern wir uns darum.';
+    await addBotMessage({ conversationId: conv.id, content: reply, source: 'rule' });
+    return { conversationId: conv.id, reply, source: 'rule', quickReplies: [{ label: 'Kontaktdaten hinterlassen', value: '__lead__' }] };
+  }
+
   // ── Stufe 2: FAQ-Keyword-Treffer (0 LLM) ──
   const faq = await matchFaq(t.id, req.message);
   if (faq) {
@@ -106,6 +133,34 @@ export async function runCascade(
     { label: 'Mit Mensch sprechen', value: '__handoff__' },
   ];
   return { conversationId: conv.id, reply, source: 'escalation', escalate: true, quickReplies };
+}
+
+/**
+ * Erkennt hoch-intentionale Wünsche per Schlüsselwort (0 LLM): Terminbuchung vor
+ * allgemeinem Kontakt. So bekommt der Nutzer sofort das Buchungstool bzw. das
+ * Lead-Formular, statt auf einen Button verwiesen zu werden.
+ */
+function detectIntent(message: string): 'booking' | 'lead' | null {
+  const m = message.toLowerCase();
+  if (
+    /\btermin\b/.test(m) ||
+    /\b(buchen|buchung)\b/.test(m) ||
+    /\b(beratungsgespräch|erstgespräch|kennenlerngespräch|kennenlernen)\b/.test(m) ||
+    /\bmeeting\b/.test(m) ||
+    /\bvideo[- ]?call\b/.test(m) ||
+    /termin.{0,12}(vereinbaren|ausmachen|machen|buchen|finden)/.test(m) ||
+    /(call|gespräch).{0,12}(vereinbaren|buchen|ausmachen)/.test(m)
+  ) {
+    return 'booking';
+  }
+  if (
+    /\b(kontakt|angebot|rückruf|zurückrufen|anrufen)\b/.test(m) ||
+    /(ruft|meldet|melden)\s+(mich|euch|ihr|sie)/.test(m) ||
+    /meine\s+(e-?mail|nummer|telefon|telefonnummer|daten|kontaktdaten)/.test(m)
+  ) {
+    return 'lead';
+  }
+  return null;
 }
 
 /** Chunk-Text für den LLM-Kontext säubern: Whitespace normalisieren, Länge kappen. */

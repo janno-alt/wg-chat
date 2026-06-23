@@ -9,6 +9,8 @@ interface Msg {
   role: 'user' | 'bot';
   text: string;
   agent?: boolean;
+  /** gesetzt => statt Text wird ein Terminbuchungs-Iframe (Meetergo) angezeigt */
+  booking?: string;
 }
 
 interface Props {
@@ -179,6 +181,8 @@ export function App({ siteKey, apiBase }: Props) {
       conversationId.current = res.conversationId;
       if (!convId) setConvId(res.conversationId);
       if (res.reply) setMessages((m) => [...m, { role: 'bot', text: res.reply }]);
+      // Terminbuchung direkt im Chat einbetten (z.B. Meetergo)
+      if (res.booking) setMessages((m) => [...m, { role: 'bot', text: '', booking: res.booking }]);
       if (res.quickReplies?.length) setQuick(res.quickReplies);
       if (res.escalate) setShowLead(false); // Lead-Formular erst auf Klick
     } catch (err) {
@@ -278,12 +282,18 @@ export function App({ siteKey, apiBase }: Props) {
           </div>
 
           <div class="kc-messages" ref={scrollRef}>
-            {messages.map((m, i) => (
-              <div key={i} class={`kc-msg ${m.role === 'user' ? 'kc-user' : 'kc-bot'}`}>
-                {m.agent && <div class="kc-agent-label">Mitarbeiter</div>}
-                {m.text}
-              </div>
-            ))}
+            {messages.map((m, i) =>
+              m.booking ? (
+                <div key={i} class="kc-embed">
+                  <iframe src={m.booking} title="Termin buchen" loading="lazy" />
+                </div>
+              ) : (
+                <div key={i} class={`kc-msg ${m.role === 'user' ? 'kc-user' : 'kc-bot'}`}>
+                  {m.agent && <div class="kc-agent-label">Mitarbeiter</div>}
+                  {m.text}
+                </div>
+              ),
+            )}
             {sending && (
               <div class="kc-typing" aria-label="schreibt">
                 <span />

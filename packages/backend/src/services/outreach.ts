@@ -25,18 +25,21 @@ export function toPath(input: string): string {
  * Mensch mehr da → lockerer, ehrlicher Ton. Wird dem Einstieg vorangestellt.
  */
 function greetingForNow(): string {
-  let hour = 12;
+  let hour = NaN;
   try {
-    hour = Number(
-      new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', hour12: false }).format(new Date()),
+    // en-GB liefert reine "09" (de-DE hängt " Uhr" an → Number()=NaN!). parseInt extra-robust.
+    const s = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Berlin', hour: '2-digit', hour12: false }).format(
+      new Date(),
     );
+    hour = parseInt(s, 10);
   } catch {
-    /* Fallback 12 */
+    /* ignore */
   }
+  if (!Number.isFinite(hour)) return 'Hallo!'; // sicherer Default – NIE der Feierabend-Ton
   if (hour >= 5 && hour < 11) return 'Guten Morgen!';
-  if (hour >= 11 && hour < 17) return 'Hallo!';
-  if (hour >= 17 && hour < 22) return 'Schon nach Feierabend bei uns, aber frag mich gern:';
-  return 'Auch spät noch wach? Frag ruhig:';
+  if (hour >= 11 && hour < 18) return 'Hallo!';
+  // ab 18:00 bis morgens: kein Mensch mehr da → lockerer Feierabend-Ton
+  return 'Schon nach Feierabend bei uns, aber frag mich gern:';
 }
 
 /**

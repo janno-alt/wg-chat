@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS tenant_settings (
 );
 ALTER TABLE tenant_settings ADD COLUMN IF NOT EXISTS notify_email text;
 ALTER TABLE tenant_settings ADD COLUMN IF NOT EXISTS lead_webhook_url text;
+ALTER TABLE tenant_settings ADD COLUMN IF NOT EXISTS booking_url text;
 
 CREATE TABLE IF NOT EXISTS outreach_triggers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

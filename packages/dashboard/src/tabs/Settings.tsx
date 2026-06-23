@@ -73,6 +73,7 @@ function SettingsForm({
   const [fallback, setFallback] = useState(s.fallbackText);
   const [notifyEmail, setNotifyEmail] = useState(s.notifyEmail ?? '');
   const [webhook, setWebhook] = useState(s.leadWebhookUrl ?? '');
+  const [bookingUrl, setBookingUrl] = useState(s.bookingUrl ?? '');
   const [primary, setPrimary] = useState(str(theme.primaryColor, '#0f766e'));
   const [bubble, setBubble] = useState(str(theme.bubbleColor, '#0f766e'));
   const [textColor, setTextColor] = useState(str(theme.textColor, '#ffffff'));
@@ -129,6 +130,7 @@ function SettingsForm({
         fallbackText: fallback,
         notifyEmail: notifyEmail.trim() || null,
         leadWebhookUrl: webhook.trim() || null,
+        bookingUrl: bookingUrl.trim() || null,
         theme: {
           primaryColor: primary,
           bubbleColor: bubble,
@@ -228,6 +230,9 @@ function SettingsForm({
           <div className="space-y-3">
             <Field label="Benachrichtigungs-E-Mail">
               <Input value={notifyEmail} onChange={(e) => setNotifyEmail(e.currentTarget.value)} placeholder="vertrieb@kunde.de" />
+            </Field>
+            <Field label="Terminbuchung (Meetergo-URL)">
+              <Input value={bookingUrl} onChange={(e) => setBookingUrl(e.currentTarget.value)} placeholder="https://cal.meetergo.com/team/..." />
             </Field>
             <Field label="Webhook-URL (CRM / FormBuilder / N8N)">
               <Input value={webhook} onChange={(e) => setWebhook(e.currentTarget.value)} placeholder="https://n8n.wg-digital.xyz/webhook/lead" />

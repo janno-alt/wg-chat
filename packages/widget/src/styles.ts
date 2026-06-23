@@ -57,6 +57,8 @@ export const STYLES = /* css */ `
 .kc-msg { max-width: 85%; padding:10px 13px; border-radius:14px; font-size:14px; line-height:1.45; white-space:pre-wrap; word-wrap:break-word; }
 .kc-msg.kc-bot { background:#fff; color:#111; align-self:flex-start; border:1px solid #ececf0; border-bottom-left-radius:4px; }
 .kc-msg.kc-user { background:var(--kc-primary); color:var(--kc-on-primary); align-self:flex-end; border-bottom-right-radius:4px; }
+.kc-embed { align-self:stretch; width:100%; }
+.kc-embed iframe { width:100%; height:440px; border:none; border-radius:12px; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.08); }
 .kc-typing { align-self:flex-start; background:#fff; border:1px solid #ececf0; border-radius:14px; border-bottom-left-radius:4px; padding:13px 14px; display:flex; gap:4px; }
 .kc-typing span { width:7px; height:7px; border-radius:50%; background:#bcbcc6; display:inline-block; animation: kc-blink 1.2s infinite ease-in-out both; }
 .kc-typing span:nth-child(2){ animation-delay:.18s; }

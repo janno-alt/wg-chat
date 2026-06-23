@@ -67,6 +67,8 @@ export const tenantSettings = pgTable('tenant_settings', {
   // Lead-Handling (Phase 4): Empfänger-E-Mail + Webhook (CRM/FormBuilder/N8N)
   notifyEmail: text('notify_email'),
   leadWebhookUrl: text('lead_webhook_url'),
+  // Terminbuchung (z.B. Meetergo): URL, die der Bot bei Terminwunsch im Chat einbettet
+  bookingUrl: text('booking_url'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

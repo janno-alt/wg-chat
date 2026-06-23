@@ -85,6 +85,8 @@ export interface ChatResponse {
   escalate?: boolean;
   /** true => ein menschlicher Agent ist aktiv (Phase 7) */
   human?: boolean;
+  /** gesetzt => Widget bettet diese Terminbuchungs-URL (z.B. Meetergo) direkt im Chat ein */
+  booking?: string;
 }
 
 /** Lead-Erfassung aus dem Widget (Eskalations-/Kontaktformular). */

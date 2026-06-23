@@ -24,6 +24,7 @@ export interface ResolvedTenant {
     thresholds: Record<string, number>;
     notifyEmail: string | null;
     leadWebhookUrl: string | null;
+    bookingUrl: string | null;
   };
 }
 
@@ -57,6 +58,7 @@ export async function resolveTenantBySiteKey(siteKey: string): Promise<ResolvedT
       thresholds: s?.thresholds ?? {},
       notifyEmail: s?.notifyEmail ?? null,
       leadWebhookUrl: s?.leadWebhookUrl ?? null,
+      bookingUrl: s?.bookingUrl ?? null,
     },
   };
 }
@@ -146,6 +148,7 @@ export interface TenantSettingsPatch {
   thresholds?: Record<string, number>;
   notifyEmail?: string | null;
   leadWebhookUrl?: string | null;
+  bookingUrl?: string | null;
 }
 
 /** Tenant-Einstellungen anlegen/aktualisieren (upsert auf tenant_id). */

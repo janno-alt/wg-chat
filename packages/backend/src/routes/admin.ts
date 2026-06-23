@@ -355,6 +355,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     thresholds: z.record(z.number()).optional(),
     notifyEmail: z.string().email().nullable().optional(),
     leadWebhookUrl: z.string().url().nullable().optional(),
+    bookingUrl: z.string().url().nullable().optional(),
   });
   app.get<{ Params: { siteKey: string } }>('/:siteKey/settings', async (req, reply) => {
     const t = await tenantOr404(req.params.siteKey, reply);

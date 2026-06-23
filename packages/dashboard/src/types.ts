@@ -150,6 +150,7 @@ export interface TenantSettings {
   thresholds: Record<string, number>;
   notifyEmail: string | null;
   leadWebhookUrl: string | null;
+  bookingUrl: string | null;
 }
 
 export interface SettingsResponse {
