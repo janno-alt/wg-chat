@@ -40,6 +40,7 @@ export function App({ siteKey, apiBase }: Props) {
   const [showLead, setShowLead] = useState(false);
   const [leadDone, setLeadDone] = useState(false);
   const [teaser, setTeaser] = useState<string | null>(null);
+  const [teaserReveal, setTeaserReveal] = useState(0); // wie viele Wörter der Sprechblase sichtbar sind
   const [openerId, setOpenerId] = useState<string | null>(null);
   const [human, setHuman] = useState(false);
   const [convId, setConvId] = useState<string | undefined>(undefined);
@@ -119,6 +120,29 @@ export function App({ siteKey, apiBase }: Props) {
     };
   }, [config]);
 
+  // Sprechblase: erst erscheint die Blase, dann der Einstiegssatz Wort für Wort.
+  useEffect(() => {
+    if (!teaser) {
+      setTeaserReveal(0);
+      return;
+    }
+    const total = teaser.split(/\s+/).filter(Boolean).length;
+    setTeaserReveal(0);
+    let count = 0;
+    let interval = 0;
+    const start = window.setTimeout(() => {
+      interval = window.setInterval(() => {
+        count += 1;
+        setTeaserReveal(count);
+        if (count >= total) window.clearInterval(interval);
+      }, 110);
+    }, 320); // kurze Pause, in der nur die leere Blase „aufploppt"
+    return () => {
+      window.clearTimeout(start);
+      if (interval) window.clearInterval(interval);
+    };
+  }, [teaser]);
+
   // Auto-scroll
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -147,6 +171,10 @@ export function App({ siteKey, apiBase }: Props) {
   const sideClass = theme.position === 'bottom-left' ? 'kc-left' : 'kc-right';
   // Sobald eine Terminbuchung (Iframe) im Chat ist, Panel breiter/höher schalten.
   const bookingActive = messages.some((m) => m.booking);
+  // Sprechblasen-Text Wort für Wort einblenden (mit Tipp-Cursor, solange noch nicht fertig).
+  const teaserWords = teaser ? teaser.split(/\s+/).filter(Boolean) : [];
+  const teaserText = teaserWords.slice(0, teaserReveal).join(' ');
+  const teaserTyping = teaser !== null && teaserReveal < teaserWords.length;
 
   function openPanel() {
     setOpen(true);
@@ -277,7 +305,8 @@ export function App({ siteKey, apiBase }: Props) {
           >
             ×
           </button>
-          {teaser}
+          {teaserText}
+          {teaserTyping && <span class="kc-teaser-cursor">▍</span>}
         </div>
       )}
 

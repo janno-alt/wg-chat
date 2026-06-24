@@ -26,14 +26,24 @@ export const STYLES = /* css */ `
 .kc-launcher-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 
 .kc-teaser {
-  position: absolute; bottom: 74px; max-width: 260px;
-  background: #fff; color: #111; border-radius: 14px; padding: 12px 14px;
-  box-shadow: 0 8px 28px rgba(0,0,0,.18); font-size: 14px; line-height: 1.4;
-  cursor: pointer; animation: kc-pop .2s ease;
+  position: absolute; bottom: 80px; width: 220px; max-width: calc(100vw - 40px); min-height: 22px;
+  background: #fff; color: #111; border-radius: 16px; padding: 13px 30px 13px 16px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.18); font-size: 14px; line-height: 1.5;
+  cursor: pointer; transform-origin: bottom right; animation: kc-bubble-in .28s cubic-bezier(.18,.9,.32,1.2);
 }
-.kc-root.kc-right .kc-teaser { right: 4px; }
-.kc-root.kc-left .kc-teaser { left: 4px; }
-.kc-teaser-close { position:absolute; top:4px; right:8px; border:none; background:none; cursor:pointer; color:#999; font-size:14px; }
+.kc-root.kc-right .kc-teaser { right: 6px; }
+.kc-root.kc-left .kc-teaser { left: 6px; transform-origin: bottom left; }
+/* Sprechblasen-Pfeil nach unten Richtung Launcher */
+.kc-teaser::after {
+  content: ''; position: absolute; bottom: -8px; width: 0; height: 0;
+  border-left: 9px solid transparent; border-right: 9px solid transparent; border-top: 9px solid #fff;
+  filter: drop-shadow(0 4px 3px rgba(0,0,0,.06));
+}
+.kc-root.kc-right .kc-teaser::after { right: 22px; }
+.kc-root.kc-left .kc-teaser::after { left: 22px; }
+.kc-teaser-close { position:absolute; top:6px; right:9px; border:none; background:none; cursor:pointer; color:#bbb; font-size:15px; line-height:1; }
+.kc-teaser-cursor { display:inline-block; width:1px; margin-left:1px; animation: kc-blink 1s step-end infinite; }
+@keyframes kc-bubble-in { from { opacity:0; transform: scale(.6) translateY(10px); } to { opacity:1; transform: scale(1) translateY(0); } }
 
 .kc-panel {
   position: absolute; bottom: 74px; width: 360px; max-width: calc(100vw - 32px);
