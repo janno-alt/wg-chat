@@ -76,9 +76,17 @@ export async function runCascade(
     };
   }
   if (intent === 'lead') {
-    const reply = 'Gerne! Hinterlasse mir kurz deine Kontaktdaten, dann kümmern wir uns darum.';
+    const hasBooking = Boolean(t.settings.bookingUrl);
+    const reply = hasBooking
+      ? 'Sehr gern! Du kannst direkt einen Termin buchen oder mir kurz deine Kontaktdaten dalassen, dann meldet sich unser Team.'
+      : 'Gerne! Hinterlasse mir kurz deine Kontaktdaten, dann meldet sich unser Team bei dir.';
     await addBotMessage({ conversationId: conv.id, content: reply, source: 'rule' });
-    return { conversationId: conv.id, reply, source: 'rule', quickReplies: [{ label: 'Kontaktdaten hinterlassen', value: '__lead__' }] };
+    const quickReplies: QuickReply[] = [
+      ...(hasBooking ? [{ label: 'Termin buchen', value: '__booking__' }] : []),
+      { label: 'Kontaktdaten hinterlassen', value: '__lead__' },
+      { label: 'Mit Mensch sprechen', value: '__handoff__' },
+    ];
+    return { conversationId: conv.id, reply, source: 'rule', escalate: true, quickReplies };
   }
 
   // ── Stufe 2: FAQ-Keyword-Treffer (0 LLM) ──
@@ -168,9 +176,12 @@ function detectIntent(message: string): 'booking' | 'lead' | null {
     return 'booking';
   }
   if (
-    /\b(kontakt|angebot|rückruf|zurückrufen|anrufen)\b/.test(m) ||
+    /\b(kontakt|kontaktformular|formular|angebot|rückruf|zurückrufen|anrufen|telefonieren|telefonat|expressanfrage)\b/.test(m) ||
     /(ruft|meldet|melden)\s+(mich|euch|ihr|sie)/.test(m) ||
-    /meine\s+(e-?mail|nummer|telefon|telefonnummer|daten|kontaktdaten)/.test(m)
+    /meine\s+(e-?mail|nummer|telefon|telefonnummer|daten|kontaktdaten)/.test(m) ||
+    /(mit\s+(einem|nem|'nem|jemandem|jemand)\s+)?(echten\s+)?(menschen|mitarbeiter|mitarbeitenden|berater|kollegen|team|mensch)\b/.test(m) ||
+    /(jemand|persönlich|direkt)\w*\s+(sprechen|reden|telefonieren|austauschen)/.test(m) ||
+    /\banfrage\b.{0,12}(stellen|schicken|senden|machen)/.test(m)
   ) {
     return 'lead';
   }
@@ -182,9 +193,11 @@ function cleanContext(s: string): string {
   return s.replace(/\s+/g, ' ').trim().slice(0, 1500);
 }
 
-/** Macht LLM-Text menschlicher: entfernt KI-typische Gedankenstriche (—/–). */
+/** Macht LLM-Text menschlicher: entfernt Gedankenstriche (—/–) und selbst erfundene Links/URLs. */
 function humanize(text: string): string {
   return text
+    .replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, '$1') // Markdown-Link → nur der Text
+    .replace(/https?:\/\/\S+/g, '') // nackte URLs entfernen (Bot soll keine Links erfinden)
     .replace(/\s*—\s*/g, ', ') // Geviertstrich → Komma
     .replace(/(\d)\s*–\s*(\d)/g, '$1-$2') // Zahlbereich: Halbgeviert → Bindestrich
     .replace(/\s*–\s*/g, ', ') // sonstiger Halbgeviertstrich → Komma
@@ -209,6 +222,9 @@ function buildSystemPrompt(tenantName: string, context: string, hasContext: bool
     `Fakten über die Firma, die nicht im Kontext stehen.\n` +
     `- Steht etwas Konkretes nicht im Kontext, sage ehrlich, dass du das gern ans Team weitergibst, oder ` +
     `schlage ein kurzes, unverbindliches Erstgespräch vor.\n` +
+    `- Gib NIEMALS selbst Links, URLs, E-Mail-Adressen oder Buchungsadressen aus und erfinde keine. Wenn ` +
+    `der Nutzer einen Termin, ein Formular, Kontakt oder ein Gespräch mit einem Menschen möchte, sage nur ` +
+    `kurz zu – Terminbuchung bzw. Kontaktformular werden vom System automatisch eingeblendet.\n` +
     `- Natürlich und knapp (2–4 Sätze). Keine Gedankenstriche (— oder –), kein HTML, kein Code.\n`;
   return hasContext
     ? `${base}\nKontext (Wissensbasis):\n${context}`

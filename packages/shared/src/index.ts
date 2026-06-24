@@ -43,6 +43,8 @@ export interface WidgetConfig {
   starterButtons: QuickReply[];
   /** clientseitige Outreach-Trigger (Phase 3 füllt das) */
   outreach: OutreachTrigger[];
+  /** Terminbuchungs-URL (z.B. Meetergo); wenn gesetzt, kann das Widget sie einbetten */
+  bookingUrl?: string | null;
 }
 
 export type OutreachCondition =

@@ -205,10 +205,17 @@ export function App({ siteKey, apiBase }: Props) {
       setShowLead(true);
       return;
     }
+    if (value === '__booking__') {
+      // Terminbuchung (Meetergo) direkt im Chat einbetten, sonst aufs Lead-Formular ausweichen.
+      if (config?.bookingUrl) setMessages((m) => [...m, { role: 'bot', text: '', booking: config.bookingUrl! }]);
+      else setShowLead(true);
+      return;
+    }
     if (value === '__handoff__') {
+      setShowLead(true);
       setMessages((m) => [
         ...m,
-        { role: 'bot', text: 'Einen Moment – ich verbinde dich mit einem Mitarbeiter. (Live-Übernahme folgt in Phase 7.)' },
+        { role: 'bot', text: 'Klar! Lass mir kurz deine Kontaktdaten da, dann meldet sich ein Mitarbeiter persönlich bei dir.' },
       ]);
       return;
     }

@@ -223,5 +223,6 @@ export async function buildWidgetConfig(t: ResolvedTenant): Promise<WidgetConfig
     theme: { ...DEFAULT_THEME, ...(t.settings.theme as object) } as WidgetConfig['theme'],
     starterButtons: t.settings.starterButtons,
     outreach,
+    bookingUrl: t.settings.bookingUrl,
   };
 }
