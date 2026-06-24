@@ -8,8 +8,8 @@ import { chunkText } from './chunking.js';
 import { crawlSite, fetchPage } from './crawler.js';
 import { generateOpenersForPage, toPath } from './outreach.js';
 
-/** Obergrenze für KI-Gesprächseinstiege pro Crawl (Kostenbremse). */
-const MAX_OPENER_PAGES = 40;
+/** Obergrenze für KI-Gesprächseinstiege pro Crawl. = Crawl-Maximum, also faktisch alle Seiten. */
+const MAX_OPENER_PAGES = 200;
 
 export interface IngestResult {
   documentId: string;
