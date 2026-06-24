@@ -145,6 +145,8 @@ export function App({ siteKey, apiBase }: Props) {
 
   const theme = config?.theme ?? FALLBACK_THEME;
   const sideClass = theme.position === 'bottom-left' ? 'kc-left' : 'kc-right';
+  // Sobald eine Terminbuchung (Iframe) im Chat ist, Panel breiter/höher schalten.
+  const bookingActive = messages.some((m) => m.booking);
 
   function openPanel() {
     setOpen(true);
@@ -280,7 +282,7 @@ export function App({ siteKey, apiBase }: Props) {
       )}
 
       {open && (
-        <div class="kc-panel" role="dialog" aria-label="Chat">
+        <div class={`kc-panel ${bookingActive ? 'kc-wide' : ''}`} role="dialog" aria-label="Chat">
           <div class="kc-header">
             <div>
               <div>{config.name}</div>

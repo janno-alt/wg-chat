@@ -45,6 +45,10 @@ export const STYLES = /* css */ `
 .kc-root.kc-right .kc-panel { right: 0; }
 .kc-root.kc-left .kc-panel { left: 0; }
 
+/* Bei eingebetteter Terminbuchung: Panel breiter & höher, Iframe groß genug ohne Scrollen */
+.kc-panel.kc-wide { width: 560px; height: 760px; max-height: calc(100vh - 32px); transition: width .2s ease, height .2s ease; }
+.kc-panel.kc-wide .kc-embed iframe { height: min(620px, calc(100vh - 210px)); }
+
 .kc-header {
   background: var(--kc-primary); color: var(--kc-on-primary);
   padding: 14px 16px; font-weight: 600; display:flex; align-items:center; justify-content:space-between;
