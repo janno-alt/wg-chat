@@ -73,6 +73,8 @@ export interface ChatRequest {
   message: string;
   /** aktuelle Seite, für Kontext/Analytics */
   pageUrl?: string;
+  /** der angezeigte Gesprächseinstieg (wird als erster Bot-Turn in den Verlauf übernommen) */
+  opener?: string;
 }
 
 export interface ChatResponse {

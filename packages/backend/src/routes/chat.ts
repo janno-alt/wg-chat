@@ -11,6 +11,7 @@ const bodySchema = z.object({
   conversationId: z.string().uuid().optional(),
   message: z.string().min(1).max(4000),
   pageUrl: z.string().max(2048).optional(),
+  opener: z.string().max(500).optional(),
 });
 
 export async function chatRoutes(app: FastifyInstance): Promise<void> {

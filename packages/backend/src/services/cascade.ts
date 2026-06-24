@@ -2,7 +2,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import type { ChatRequest, ChatResponse, QuickReply } from '@wg-chat/shared';
 import { tdb } from '../db/client.js';
 import { knowledgeGaps } from '../db/schema.js';
-import { getProviderForTenant, type LlmProvider } from '../llm/index.js';
+import { getProviderForTenant, type LlmProvider, type ChatMessage } from '../llm/index.js';
 import { resolveThresholds, type ResolvedTenant } from './tenant.js';
 import { matchFaq } from './faq.js';
 import { searchCache, searchChunks, type ChunkHit } from './retrieval.js';
@@ -11,6 +11,7 @@ import {
   addBotMessage,
   addUserMessage,
   getOrCreateConversation,
+  getRecentHistory,
   markEscalated,
 } from './conversation.js';
 
@@ -33,6 +34,12 @@ export async function runCascade(
     conversationId: req.conversationId,
     pageUrl: req.pageUrl,
   });
+  // Den angezeigten Gesprächseinstieg als ersten Bot-Turn übernehmen (nur bei neuer
+  // Konversation), damit der Verlauf kohärent ist und "Nö"/"erzähl mal" Bezug haben.
+  if (req.opener) {
+    const prior = await getRecentHistory(conv.id, 1);
+    if (!prior.length) await addBotMessage({ conversationId: conv.id, content: req.opener.slice(0, 300), source: 'rule' });
+  }
   await addUserMessage(conv.id, req.message);
 
   // Phase 7: Wenn ein Mensch übernommen hat, antwortet die KI nicht.
@@ -82,11 +89,18 @@ export async function runCascade(
     return { conversationId: conv.id, reply: faq.answer, source: 'faq' };
   }
 
+  // Der bisherige Gesprächsverlauf (inkl. Opener) – für kontextbewusste Antworten.
+  const history = (await getRecentHistory(conv.id, 8)) as ChatMessage[];
+
   // Ab hier brauchen wir ein Embedding. Ohne Provider/Key → direkt eskalieren.
   const provider = getProviderForTenant(t.llmProviderCfg);
+  // Kontextbewusste Suchanfrage: letzte Bot-Frage + aktuelle Nachricht, damit kurze
+  // Folgeantworten ("ja", "erzähl mal") beim Thema bleiben statt zufällig zu treffen.
+  const priorAssistant = [...history].reverse().find((m) => m.role === 'assistant')?.content;
+  const retrievalQuery = priorAssistant ? `${priorAssistant}\n${req.message}` : req.message;
   let embedding: number[] | null = null;
   try {
-    const emb = await provider.embed([req.message]);
+    const emb = await provider.embed([retrievalQuery]);
     embedding = emb.embeddings[0] ?? null;
     await recordUsage({
       tenantId: t.id,
@@ -109,9 +123,9 @@ export async function runCascade(
       return { conversationId: conv.id, reply: cached.content, source: 'cache' };
     }
 
-    // ── Stufe 4+5: Retrieval → kuratierte Antwort ODER LLM-Zusammenfassung ──
+    // ── Stufe 4+5: Retrieval + kontextbewusste, gesprächsorientierte Antwort ──
     const hits = await searchChunks(t.id, embedding, 5);
-    const ans = await answerFromHits(t, req.message, hits, th, provider, conv.id, log);
+    const ans = await answerFromHits(t, history, hits, th, provider, conv.id, log);
     if (ans) {
       await addBotMessage({
         conversationId: conv.id,
@@ -180,28 +194,26 @@ function humanize(text: string): string {
     .trim();
 }
 
-function buildSystemPrompt(tenantName: string, context: string): string {
-  return (
-    `Du bist der Kundenberater von "${tenantName}". Antworte natürlich und hilfreich in 2–3 Sätzen ` +
-    `– nicht länger, aber auch nicht nur ein knapper Halbsatz.\n` +
+function buildSystemPrompt(tenantName: string, context: string, hasContext: boolean): string {
+  const base =
+    `Du bist ein sympathischer, kompetenter Berater/Verkäufer von "${tenantName}" im Live-Chat. ` +
+    `Führe das Gespräch natürlich weiter, wie ein guter Mitarbeiter im Laden.\n` +
     `Regeln:\n` +
+    `- Beziehe dich auf den bisherigen Verlauf. Kurze Antworten wie "Nö", "ja" oder "erzähl mal" ` +
+    `beziehen sich auf DEINE letzte Frage – reagiere passend und frage NICHT zurück, was gemeint ist.\n` +
+    `- Bleib beim aktuellen Thema des Gesprächs. Wechsle NICHT unvermittelt zu einem anderen Angebot.\n` +
     `- Konkrete Fakten (Preise, Zahlen, Leistungen, Pakete) NUR, wenn sie wörtlich im Kontext stehen. ` +
-    `Erfinde nichts, nenne keine Beispiele, Branchen oder Anwendungsfälle, die nicht im Kontext stehen.\n` +
-    `- Trenne Angebotsarten strikt: einmalige Leistungen (z. B. Website-Erstellung) sind etwas ANDERES ` +
-    `als laufende/monatliche Kosten (z. B. Wartung, Hosting, Support). Stelle ein monatliches Paket ` +
-    `NIEMALS als Preis für die Erstellung dar und vermische die beiden nicht. Bist du unsicher, welcher ` +
-    `Preis zu welchem Angebot gehört, nenne ihn lieber gar nicht.\n` +
-    `- Du darfst ohne neue Fakten allgemein ergänzen, dass der genaue Preis bzw. Umfang von den ` +
-    `individuellen Anforderungen abhängt.\n` +
-    `- Schließe, wenn es zur Frage passt, mit einer kurzen, freundlichen Einladung, für ein konkretes ` +
-    `Angebot oder Details eine Anfrage zu stellen. Dezent, nicht werblich oder aufdringlich.\n` +
-    `- Schreibe menschlich und natürlich. Verwende KEINE Gedankenstriche (— oder –); nutze stattdessen ` +
-    `Kommas, Punkte oder Klammern.\n` +
-    `- Gib niemals HTML, Code oder rohe Seitenfragmente aus.\n` +
-    `- Steht gar keine passende Information im Kontext, sage in einem Satz, dass du das ans Team ` +
-    `weiterleitest, ohne Details zu erfinden.\n\n` +
-    `Kontext:\n${context}`
-  );
+    `Erfinde nichts, nenne keine Beispiele/Branchen/Zahlen, die nicht im Kontext stehen. Trenne einmalige ` +
+    `Leistungen klar von laufenden/monatlichen Kosten und vermische sie nicht.\n` +
+    `- Du darfst gesprächig sein (nachfragen, einordnen, eine kurze Rückfrage stellen), aber behaupte keine ` +
+    `Fakten über die Firma, die nicht im Kontext stehen.\n` +
+    `- Steht etwas Konkretes nicht im Kontext, sage ehrlich, dass du das gern ans Team weitergibst, oder ` +
+    `schlage ein kurzes, unverbindliches Erstgespräch vor.\n` +
+    `- Natürlich und knapp (2–4 Sätze). Keine Gedankenstriche (— oder –), kein HTML, kein Code.\n`;
+  return hasContext
+    ? `${base}\nKontext (Wissensbasis):\n${context}`
+    : `${base}\n(Kein passender Wissens-Eintrag gefunden – bleib beim Gesprächsverlauf, werde nicht ` +
+        `konkret zu Leistungen oder Preisen, sondern verstehe den Bedarf oder biete ein Erstgespräch an.)`;
 }
 
 export interface KbAnswer {
@@ -210,15 +222,16 @@ export interface KbAnswer {
 }
 
 /**
- * Erzeugt aus Retrieval-Treffern die eigentliche Antwort und ist die EINE Quelle der
- * Wahrheit für den Bot UND das Dashboard-„Wissen testen". Kuratierte FAQ-Antworten
- * (canonicalAnswer) kommen direkt; gecrawlte Seiteninhalte werden vom LLM zu einer
- * eigenständigen Antwort zusammengefasst. null → nichts Brauchbares (→ Eskalation).
- * Schreibt llm_usage bei Generierung (echte Kosten, auch im Test).
+ * Erzeugt die eigentliche Antwort und ist die EINE Quelle der Wahrheit für Bot UND
+ * Dashboard-„Wissen testen". `history` ist der Gesprächsverlauf (chronologisch, endet
+ * mit der aktuellen Nutzernachricht). Kuratierte FAQ-Antworten kommen direkt; sonst
+ * antwortet das LLM gesprächs- und kontextbewusst. Bei laufendem Dialog wird auch ohne
+ * starken KB-Treffer geantwortet (z.B. auf "Nö"), aber ohne Fakten zu erfinden.
+ * null → nichts Sinnvolles möglich (→ Eskalation). Schreibt llm_usage bei Generierung.
  */
 export async function answerFromHits(
   t: ResolvedTenant,
-  question: string,
+  history: ChatMessage[],
   hits: ChunkHit[],
   th: { direct: number; rag: number },
   provider: LlmProvider,
@@ -226,51 +239,52 @@ export async function answerFromHits(
   log: LogFn = () => {},
 ): Promise<KbAnswer | null> {
   const top = hits[0];
-  if (!top) return null;
 
   // Kuratierte FAQ-Antwort bei hoher Ähnlichkeit → direkt, ohne Generierung.
-  if (top.canonicalAnswer?.trim() && top.similarity >= th.direct) {
+  if (top?.canonicalAnswer?.trim() && top.similarity >= th.direct) {
     log(`retrieval-direct (canonical) sim=${top.similarity.toFixed(3)}`);
     return { reply: top.canonicalAnswer.trim(), source: 'retrieval' };
   }
 
-  // Seiteninhalte → LLM-Zusammenfassung (innerhalb Budget).
-  if (top.similarity >= th.rag) {
-    const within = await canGenerate(t.monthlyBudgetEur);
-    if (!within) {
-      log('budget exhausted → escalation statt RAG');
-      return null;
+  const hasContext = Boolean(top && top.similarity >= th.rag);
+  const inConversation = history.length >= 3; // Opener + ≥1 Nutzer + … = laufender Dialog
+  // Kalt + kein Treffer + kein laufendes Gespräch → eskalieren.
+  if (!hasContext && !inConversation) return null;
+
+  const within = await canGenerate(t.monthlyBudgetEur);
+  if (!within) {
+    log('budget exhausted → escalation statt RAG');
+    return null;
+  }
+
+  const context = hasContext
+    ? hits
+        .filter((h) => h.similarity >= th.rag)
+        .slice(0, 4)
+        .map((h, i) => `[${i + 1}] ${cleanContext(h.content)}`)
+        .join('\n\n')
+    : '';
+
+  try {
+    const gen = await provider.generate(
+      [{ role: 'system', content: buildSystemPrompt(t.name, context, hasContext) }, ...history.slice(-8)],
+      { temperature: 0.3, maxTokens: 400 },
+    );
+    await recordUsage({
+      tenantId: t.id,
+      conversationId: conversationId ?? undefined,
+      provider: provider.name,
+      model: provider.chatModel,
+      purpose: 'generate',
+      usage: gen.usage,
+    });
+    const reply = humanize(gen.text.trim());
+    if (reply) {
+      log(`generated hasContext=${hasContext} sim=${top ? top.similarity.toFixed(3) : 'n/a'}`);
+      return { reply, source: 'llm' };
     }
-    const context = hits
-      .filter((h) => h.similarity >= th.rag)
-      .slice(0, 4)
-      .map((h, i) => `[${i + 1}] ${cleanContext(h.content)}`)
-      .join('\n\n');
-    if (!context) return null;
-    try {
-      const gen = await provider.generate(
-        [
-          { role: 'system', content: buildSystemPrompt(t.name, context) },
-          { role: 'user', content: question },
-        ],
-        { temperature: 0.2, maxTokens: 350 },
-      );
-      await recordUsage({
-        tenantId: t.id,
-        conversationId: conversationId ?? undefined,
-        provider: provider.name,
-        model: provider.chatModel,
-        purpose: 'generate',
-        usage: gen.usage,
-      });
-      const reply = humanize(gen.text.trim());
-      if (reply) {
-        log(`rag generated sim=${top.similarity.toFixed(3)}`);
-        return { reply, source: 'llm' };
-      }
-    } catch (err) {
-      log(`generate failed: ${(err as Error).message}`);
-    }
+  } catch (err) {
+    log(`generate failed: ${(err as Error).message}`);
   }
   return null;
 }

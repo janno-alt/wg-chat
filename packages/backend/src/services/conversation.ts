@@ -77,6 +77,25 @@ export async function addBotMessage(params: {
   });
 }
 
+/**
+ * Jüngste Nachrichten einer Konversation als Chat-Verlauf (chronologisch), gemappt auf
+ * user/assistant – für kontextbewusste LLM-Antworten. Begrenzt + Länge gekappt.
+ */
+export async function getRecentHistory(
+  conversationId: string,
+  limit = 8,
+): Promise<{ role: 'user' | 'assistant'; content: string }[]> {
+  const rows = await tdb()
+    .select({ role: messages.role, content: messages.content })
+    .from(messages)
+    .where(eq(messages.conversationId, conversationId))
+    .orderBy(desc(messages.createdAt))
+    .limit(limit);
+  return rows
+    .reverse()
+    .map((m) => ({ role: m.role === 'user' ? ('user' as const) : ('assistant' as const), content: m.content.slice(0, 800) }));
+}
+
 export async function markEscalated(conversationId: string): Promise<void> {
   await tdb()
     .update(conversations)

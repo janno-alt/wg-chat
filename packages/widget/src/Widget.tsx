@@ -48,6 +48,7 @@ export function App({ siteKey, apiBase }: Props) {
   const openRef = useRef(false);
   const teaserRef = useRef<string | null>(null);
   const engagedRef = useRef(false);
+  const openerTextRef = useRef<string | null>(null);
   useEffect(() => {
     openRef.current = open;
   }, [open]);
@@ -104,6 +105,7 @@ export function App({ siteKey, apiBase }: Props) {
       .then((op) => {
         if (cancelled || !op) return;
         setOpenerId(op.id);
+        openerTextRef.current = op.text;
         // Opener als erste Nachricht setzen, solange nur die Begrüßung dasteht.
         setMessages((prev) => (prev.length === 1 && prev[0]!.role === 'bot' ? [{ role: 'bot', text: op.text }] : prev));
         timer = window.setTimeout(() => {
@@ -175,6 +177,7 @@ export function App({ siteKey, apiBase }: Props) {
         conversationId: conversationId.current,
         message: trimmed,
         pageUrl: window.location.href,
+        opener: openerTextRef.current ?? undefined,
       });
       const elapsed = Date.now() - startedAt;
       if (elapsed < minTypingMs) await new Promise((r) => setTimeout(r, minTypingMs - elapsed));

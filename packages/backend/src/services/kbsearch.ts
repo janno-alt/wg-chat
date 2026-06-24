@@ -32,7 +32,14 @@ export async function testKnowledge(t: ResolvedTenant, query: string): Promise<K
 
   const hits = await searchChunks(t.id, emb.embeddings[0] ?? [], 8);
   const th = resolveThresholds(t);
-  const ans = await answerFromHits(t, query, hits, { direct: th.direct, rag: th.rag }, provider, null);
+  const ans = await answerFromHits(
+    t,
+    [{ role: 'user', content: query }],
+    hits,
+    { direct: th.direct, rag: th.rag },
+    provider,
+    null,
+  );
   const answer = ans ?? { reply: t.settings.fallbackText, source: 'escalation' as const };
 
   return { hits, thresholds: { direct: th.direct, rag: th.rag }, answer };
