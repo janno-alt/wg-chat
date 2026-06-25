@@ -18,6 +18,14 @@ const schema = z.object({
   // Grammatik & Verkaufs-Copy. Pro Crawl je Seite ein Aufruf, daher vernachlässigbar.
   MISTRAL_OPENER_MODEL: z.string().default('mistral-large-latest'),
   MISTRAL_EMBED_MODEL: z.string().default('mistral-embed'),
+
+  // Claude NUR für Management-Aufgaben (Einstiege aus EUREN Kundenseiten, keine
+  // End-Nutzer-Daten). Der Chat-Antwortpfad bleibt IMMER Mistral/EU.
+  // OPENER_PROVIDER=auto => Claude, falls ANTHROPIC_API_KEY gesetzt, sonst Mistral.
+  ANTHROPIC_API_KEY: z.string().default(''),
+  ANTHROPIC_OPENER_MODEL: z.string().default('claude-sonnet-4-6'),
+  ANTHROPIC_BASE_URL: z.string().url().default('https://api.anthropic.com'),
+  OPENER_PROVIDER: z.enum(['auto', 'mistral', 'anthropic']).default('auto'),
   MISTRAL_BASE_URL: z.string().url().default('https://api.mistral.ai'),
 
   EMBEDDING_DIMENSIONS: z.coerce.number().default(1024),

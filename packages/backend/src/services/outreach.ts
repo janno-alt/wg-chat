@@ -2,6 +2,7 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { tdb } from '../db/client.js';
 import { outreachOpeners } from '../db/schema.js';
 import { getProviderForTenant, hasEmbeddings, type TenantLlmCfg } from '../llm/index.js';
+import { anthropicGenerate } from '../llm/anthropic.js';
 import { getConfig } from '../config.js';
 import { recordUsage } from './usage.js';
 
@@ -56,42 +57,62 @@ export async function generateOpenersForPage(
   llmCfg: TenantLlmCfg = {},
 ): Promise<number> {
   if (!hasEmbeddings(llmCfg) || pageText.trim().length < 120) return 0;
-  // Stärkeres Modell (mistral-large) nur hier: deutlich bessere deutsche Grammatik & Copy.
-  const provider = getProviderForTenant({ ...llmCfg, chatModel: getConfig().MISTRAL_OPENER_MODEL });
+  const cfg = getConfig();
+  const system =
+    'Du bist ein erfahrener, sympathischer Verkäufer und Texter. Ein Besucher kommt auf diese ' +
+    'Seite, hat aber nur ein grobes Problem und weiß noch nicht genau, was er braucht. Formuliere ' +
+    'GENAU 2 kurze, exzellent formulierte Einstiegsfragen, mit denen ein guter Verkäufer locker ' +
+    'ins Gespräch kommt und Bedarf weckt – je eine pro Zeile, ohne Nummerierung, ohne Anführungszeichen.\n' +
+    'Anforderungen:\n' +
+    '- EINWANDFREIE deutsche Grammatik, Rechtschreibung und natürlicher Klang. Lieber einfach und ' +
+    'flüssig als kompliziert.\n' +
+    '- OFFENE Frage zur Situation des Besuchers (was er nutzt, was ihn stört, was er erreichen will). ' +
+    'KEINE Ja/Nein-Frage und NICHT "Brauchst du Hilfe bei ...".\n' +
+    '- Frage nach dem Besucher, nicht nach einer Aufgabe, die er selbst erledigt oder sich durchklickt.\n' +
+    '- Höchstens 12 Wörter, per "du" angesprochen, kein Gedankenstrich, kein Emoji, KEIN "Hallo" am ' +
+    'Anfang (das wird automatisch ergänzt).\n' +
+    '- Beispiel Seite Website-Wartung: GUT "Welches System steckt aktuell hinter deiner Website?" — ' +
+    'SCHLECHT "Brauchst du Hilfe bei der Einrichtung eines Wartungsvertrags?".\n' +
+    '- Beispiel Seite Videomarketing: GUT "Welche Geschichte möchtest du mit einem Video erzählen?".';
+  const user = `Seitentitel: ${pageTitle ?? '—'}\nSeiteninhalt (Auszug):\n${pageText.slice(0, 1800)}`;
   try {
-    const gen = await provider.generate(
-      [
-        {
-          role: 'system',
-          content:
-            'Du bist ein erfahrener, sympathischer Verkäufer und Texter. Ein Besucher kommt auf diese ' +
-            'Seite, hat aber nur ein grobes Problem und weiß noch nicht genau, was er braucht. Formuliere ' +
-            'GENAU 2 kurze, exzellent formulierte Einstiegsfragen, mit denen ein guter Verkäufer locker ' +
-            'ins Gespräch kommt und Bedarf weckt – je eine pro Zeile, ohne Nummerierung, ohne Anführungszeichen.\n' +
-            'Anforderungen:\n' +
-            '- EINWANDFREIE deutsche Grammatik, Rechtschreibung und natürlicher Klang. Lieber einfach und ' +
-            'flüssig als kompliziert.\n' +
-            '- OFFENE Frage zur Situation des Besuchers (was er nutzt, was ihn stört, was er erreichen will). ' +
-            'KEINE Ja/Nein-Frage und NICHT "Brauchst du Hilfe bei ...".\n' +
-            '- Frage nach dem Besucher, nicht nach einer Aufgabe, die er selbst erledigt oder sich durchklickt.\n' +
-            '- Höchstens 12 Wörter, per "du" angesprochen, kein Gedankenstrich, kein Emoji, KEIN "Hallo" am ' +
-            'Anfang (das wird automatisch ergänzt).\n' +
-            '- Beispiel Seite Website-Wartung: GUT "Welches System steckt aktuell hinter deiner Website?" — ' +
-            'SCHLECHT "Brauchst du Hilfe bei der Einrichtung eines Wartungsvertrags?".\n' +
-            '- Beispiel Seite Videomarketing: GUT "Welche Geschichte möchtest du mit einem Video erzählen?".',
-        },
-        { role: 'user', content: `Seitentitel: ${pageTitle ?? '—'}\nSeiteninhalt (Auszug):\n${pageText.slice(0, 1800)}` },
-      ],
-      { temperature: 0.55, maxTokens: 150 },
-    );
-    await recordUsage({
-      tenantId,
-      provider: provider.name,
-      model: provider.chatModel,
-      purpose: 'generate',
-      usage: gen.usage,
-    });
-    const lines = gen.text
+    // Einstiege aus EUREN Kundenseiten (keine End-Nutzer-Daten): Claude, falls konfiguriert,
+    // sonst Mistral-large. Der Chat-Antwortpfad bleibt davon unberührt (immer Mistral/EU).
+    const useAnthropic = Boolean(cfg.ANTHROPIC_API_KEY) && cfg.OPENER_PROVIDER !== 'mistral';
+    let genText: string;
+    let usage: { inputTokens: number; outputTokens: number };
+    let usedProvider: string;
+    let usedModel: string;
+    if (useAnthropic) {
+      const r = await anthropicGenerate({
+        apiKey: cfg.ANTHROPIC_API_KEY,
+        model: cfg.ANTHROPIC_OPENER_MODEL,
+        baseUrl: cfg.ANTHROPIC_BASE_URL,
+        system,
+        user,
+        maxTokens: 200,
+        temperature: 0.6,
+      });
+      genText = r.text;
+      usage = r.usage;
+      usedProvider = 'anthropic';
+      usedModel = cfg.ANTHROPIC_OPENER_MODEL;
+    } else {
+      const provider = getProviderForTenant({ ...llmCfg, chatModel: cfg.MISTRAL_OPENER_MODEL });
+      const gen = await provider.generate(
+        [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        { temperature: 0.55, maxTokens: 150 },
+      );
+      genText = gen.text;
+      usage = gen.usage;
+      usedProvider = provider.name;
+      usedModel = provider.chatModel;
+    }
+    await recordUsage({ tenantId, provider: usedProvider, model: usedModel, purpose: 'generate', usage });
+    const lines = genText
       .split('\n')
       .map((l) =>
         l
