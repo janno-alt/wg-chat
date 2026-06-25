@@ -2,6 +2,7 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { tdb } from '../db/client.js';
 import { outreachOpeners } from '../db/schema.js';
 import { getProviderForTenant, hasEmbeddings, type TenantLlmCfg } from '../llm/index.js';
+import { getConfig } from '../config.js';
 import { recordUsage } from './usage.js';
 
 /** Prefix-Match wie im Widget: "/preise" matcht /preise und Unterpfade; "/" ist seitenweit. */
@@ -55,31 +56,33 @@ export async function generateOpenersForPage(
   llmCfg: TenantLlmCfg = {},
 ): Promise<number> {
   if (!hasEmbeddings(llmCfg) || pageText.trim().length < 120) return 0;
-  const provider = getProviderForTenant(llmCfg);
+  // Stärkeres Modell (mistral-large) nur hier: deutlich bessere deutsche Grammatik & Copy.
+  const provider = getProviderForTenant({ ...llmCfg, chatModel: getConfig().MISTRAL_OPENER_MODEL });
   try {
     const gen = await provider.generate(
       [
         {
           role: 'system',
           content:
-            'Du bist ein erfahrener, sympathischer Verkäufer in einem Ladengeschäft. Ein Besucher kommt ' +
-            'auf diese Seite, hat aber nur ein grobes Problem und weiß noch nicht genau, was er braucht. ' +
-            'Formuliere GENAU 2 kurze Einstiegsfragen, mit denen ein guter Verkäufer locker ins Gespräch ' +
-            'kommt und Bedarf weckt – je eine pro Zeile, ohne Nummerierung.\n' +
-            'Regeln:\n' +
-            '- OFFENE Frage zur Situation des Besuchers (was er nutzt, was ihn stört, was er erreichen ' +
-            'will). KEINE Ja/Nein-Frage und NICHT "Brauchst du Hilfe bei ...".\n' +
-            '- Frage nach dem Besucher, nicht nach einer Aufgabe, die er selbst erledigt oder die man sich ' +
-            'durchklicken kann.\n' +
-            '- Max. 10 Wörter, Deutsch, kein Gedankenstrich, kein Emoji, KEIN "Hallo" am Anfang (das wird ' +
-            'automatisch ergänzt).\n' +
-            '- Beispiel Seite Website-Wartung: GUT "Welches Website-System nutzt du aktuell?" — SCHLECHT ' +
-            '"Brauchst du Hilfe bei der Einrichtung eines Wartungsvertrags?".\n' +
-            '- Beispiel Seite Videomarketing: GUT "Hast du schon mal einen Werbefilm produziert?".',
+            'Du bist ein erfahrener, sympathischer Verkäufer und Texter. Ein Besucher kommt auf diese ' +
+            'Seite, hat aber nur ein grobes Problem und weiß noch nicht genau, was er braucht. Formuliere ' +
+            'GENAU 2 kurze, exzellent formulierte Einstiegsfragen, mit denen ein guter Verkäufer locker ' +
+            'ins Gespräch kommt und Bedarf weckt – je eine pro Zeile, ohne Nummerierung, ohne Anführungszeichen.\n' +
+            'Anforderungen:\n' +
+            '- EINWANDFREIE deutsche Grammatik, Rechtschreibung und natürlicher Klang. Lieber einfach und ' +
+            'flüssig als kompliziert.\n' +
+            '- OFFENE Frage zur Situation des Besuchers (was er nutzt, was ihn stört, was er erreichen will). ' +
+            'KEINE Ja/Nein-Frage und NICHT "Brauchst du Hilfe bei ...".\n' +
+            '- Frage nach dem Besucher, nicht nach einer Aufgabe, die er selbst erledigt oder sich durchklickt.\n' +
+            '- Höchstens 12 Wörter, per "du" angesprochen, kein Gedankenstrich, kein Emoji, KEIN "Hallo" am ' +
+            'Anfang (das wird automatisch ergänzt).\n' +
+            '- Beispiel Seite Website-Wartung: GUT "Welches System steckt aktuell hinter deiner Website?" — ' +
+            'SCHLECHT "Brauchst du Hilfe bei der Einrichtung eines Wartungsvertrags?".\n' +
+            '- Beispiel Seite Videomarketing: GUT "Welche Geschichte möchtest du mit einem Video erzählen?".',
         },
-        { role: 'user', content: `Seitentitel: ${pageTitle ?? '—'}\nSeiteninhalt (Auszug):\n${pageText.slice(0, 1500)}` },
+        { role: 'user', content: `Seitentitel: ${pageTitle ?? '—'}\nSeiteninhalt (Auszug):\n${pageText.slice(0, 1800)}` },
       ],
-      { temperature: 0.6, maxTokens: 120 },
+      { temperature: 0.55, maxTokens: 150 },
     );
     await recordUsage({
       tenantId,
@@ -90,8 +93,17 @@ export async function generateOpenersForPage(
     });
     const lines = gen.text
       .split('\n')
-      .map((l) => l.replace(/^[\s\-*•\d.)]+/, '').replace(/[—–]/g, ',').replace(/^["']|["']$/g, '').trim())
-      .filter((l) => l.length >= 6 && l.length <= 120)
+      .map((l) =>
+        l
+          .replace(/^[\s\-*•\d.)]+/, '') // Aufzählungszeichen
+          .replace(/[—–]/g, ', ') // Gedankenstriche
+          .replace(/^["'„“»]+|["'”«]+$/g, '') // umschließende Anführungszeichen
+          .replace(/\s{2,}/g, ' ')
+          .trim(),
+      )
+      .map((l) => (l ? l.charAt(0).toUpperCase() + l.slice(1) : l)) // Großbuchstabe am Anfang
+      .map((l) => (l && !/[?!.]$/.test(l) ? `${l}?` : l)) // Einstiege sind Fragen
+      .filter((l) => l.length >= 8 && l.length <= 120)
       .slice(0, 2);
     if (!lines.length) return 0;
     // Alte KI-Einstiege dieser Seite ersetzen (manuelle bleiben), damit Re-Crawl nicht dupliziert.

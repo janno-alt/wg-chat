@@ -14,6 +14,9 @@ const schema = z.object({
   LLM_PROVIDER: z.enum(['mistral']).default('mistral'),
   MISTRAL_API_KEY: z.string().default(''),
   MISTRAL_CHAT_MODEL: z.string().default('mistral-small-latest'),
+  // Stärkeres Modell nur für die (seltene) Einstiegs-Generierung – bessere deutsche
+  // Grammatik & Verkaufs-Copy. Pro Crawl je Seite ein Aufruf, daher vernachlässigbar.
+  MISTRAL_OPENER_MODEL: z.string().default('mistral-large-latest'),
   MISTRAL_EMBED_MODEL: z.string().default('mistral-embed'),
   MISTRAL_BASE_URL: z.string().url().default('https://api.mistral.ai'),
 
