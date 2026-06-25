@@ -139,6 +139,45 @@ tool(
   ({ siteKey, query }) => adminFetch('POST', `/${siteKey}/kb/search`, { query }),
 );
 
+// ── Gesprächseinstiege (seitenspezifisch, A/B + Statistik) ──
+tool(
+  'list_openers',
+  'Listet alle Gesprächseinstiege eines Kunden (pro Seite, mit Impressionen/Klicks). Quelle ai = KI-generiert, manual = manuell/von Claude.',
+  { siteKey },
+  ({ siteKey }) => adminFetch('GET', `/${siteKey}/openers`),
+);
+
+tool(
+  'create_opener',
+  'Legt einen Gesprächseinstieg an. NUR die Frage selbst (ohne "Hallo" – eine tageszeitabhängige Begrüßung wird automatisch vorangestellt). pageMatch = Pfad-Prefix der Seite (z. B. /leistungen/wartung, "/" = überall). Ideal, um von Claude verfasste, hochwertige Einstiege einzuspielen.',
+  {
+    siteKey,
+    pageMatch: z.string().describe('Pfad-Prefix der Seite, z. B. /leistungen/wartung oder /'),
+    text: z.string().min(3).max(300).describe('Die Einstiegsfrage, ohne führendes "Hallo"'),
+  },
+  ({ siteKey, pageMatch, text }) => adminFetch('POST', `/${siteKey}/openers`, { pageMatch, text }),
+);
+
+tool(
+  'update_opener',
+  'Ändert einen Gesprächseinstieg (Text, Seite, aktiv/pausiert).',
+  {
+    siteKey,
+    id: z.string().describe('ID des Einstiegs (aus list_openers)'),
+    text: z.string().min(3).max(300).optional(),
+    pageMatch: z.string().optional(),
+    active: z.boolean().optional(),
+  },
+  ({ siteKey, id, ...patch }) => adminFetch('PATCH', `/${siteKey}/openers/${id}`, patch),
+);
+
+tool(
+  'delete_opener',
+  'Löscht einen Gesprächseinstieg (z. B. einen schwachen KI-Vorschlag, bevor ein besserer angelegt wird).',
+  { siteKey, id: z.string() },
+  ({ siteKey, id }) => adminFetch('DELETE', `/${siteKey}/openers/${id}`),
+);
+
 // ── Konversationen / Leads / Wissenslücken ──
 tool('list_conversations', 'Listet jüngste Konversationen eines Kunden.', { siteKey }, ({ siteKey }) =>
   adminFetch('GET', `/${siteKey}/conversations`),
