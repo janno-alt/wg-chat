@@ -10,3 +10,4 @@ coverage/
 *.tsbuildinfo
 postgres-data/
 .claude/settings.local.json
+.mcp.json
