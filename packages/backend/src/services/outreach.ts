@@ -57,6 +57,20 @@ export async function generateOpenersForPage(
   llmCfg: TenantLlmCfg = {},
 ): Promise<number> {
   if (!hasEmbeddings(llmCfg) || pageText.trim().length < 120) return 0;
+  // Seiten mit MANUELL kuratierten Einstiegen nicht automatisch mit KI-Einstiegen ergänzen
+  // (menschliche Kuratierung hat Vorrang, kein Zumüllen bei Re-Crawls).
+  const curated = await tdb()
+    .select({ id: outreachOpeners.id })
+    .from(outreachOpeners)
+    .where(
+      and(
+        eq(outreachOpeners.tenantId, tenantId),
+        eq(outreachOpeners.pageMatch, pagePath),
+        eq(outreachOpeners.source, 'manual'),
+      ),
+    )
+    .limit(1);
+  if (curated.length) return 0;
   const cfg = getConfig();
   const system =
     'Du bist ein erfahrener, sympathischer Verkäufer und Texter. Ein Besucher kommt auf diese ' +
